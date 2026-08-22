@@ -70,10 +70,12 @@
 | `DEBUG_MODE` | 选填 | 默认为 `false`（标准日志模式，简洁输出）。设为 `true`（Debug 详细日志模式）则在 Actions 控制台与 Summary 中输出详细明细表格 |
 | `DISABLE_ACTIONS` | 选填 | 默认为 `true`（自动关闭每个 Fork 仓库的 Actions）。若不想关闭 Fork 仓库的 Actions，可设为 `false` |
 
-> **提示（可选环境变量）**：
-> 如果需要排除特定仓库，可以在 **Variables**（仓库变量）中添加：
-> - `EXCLUDE_REPOS`: `repo-name-1,owner/repo-name-2`（逗号分隔）
-> - `INCLUDE_ONLY`: `repo-name-3`（仅同步指定的仓库）
+> **💡 提示（高级可选配置：黑白名单控制）**：
+> 可以在 **Variables**（仓库变量）或 **Secrets** 中添加：
+> - `INCLUDE_ONLY`：**仅同步指定仓库（白名单）**，例如 `repo-1, owner/repo-2`。设置后将只同步列表里的仓库，忽略其他全部 Fork 仓库。
+> - `EXCLUDE_REPOS`：**排除特定仓库（黑名单）**，例如 `my-custom-repo, owner/test-repo`。设置后将跳过这些仓库。
+> 
+> *注：在网页上点击 **Run workflow** 手动运行时，也可以在输入框中临时填入 `include_only` 或 `exclude_repos` 进行单次指定运行。*
 
 ---
 

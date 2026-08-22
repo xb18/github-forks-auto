@@ -20,6 +20,16 @@ on:
     types: [started]
   workflow_dispatch:
     inputs:
+      include_only:
+        description: 'Only sync specified repos (e.g. repo1,owner/repo2). Leave empty to sync all.'
+        type: string
+        required: false
+        default: ''
+      exclude_repos:
+        description: 'Exclude specific repos (e.g. repo3,owner/repo4). Leave empty to sync all.'
+        type: string
+        required: false
+        default: ''
       debug_mode:
         description: 'Enable debug mode (display detailed repo names in public summary)'
         type: boolean
@@ -64,8 +74,8 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
-          EXCLUDE_REPOS: ${{ vars.EXCLUDE_REPOS || secrets.EXCLUDE_REPOS }}
-          INCLUDE_ONLY: ${{ vars.INCLUDE_ONLY || secrets.INCLUDE_ONLY }}
+          EXCLUDE_REPOS: ${{ inputs.exclude_repos != '' && inputs.exclude_repos || vars.EXCLUDE_REPOS || secrets.EXCLUDE_REPOS }}
+          INCLUDE_ONLY: ${{ inputs.include_only != '' && inputs.include_only || vars.INCLUDE_ONLY || secrets.INCLUDE_ONLY }}
           DEBUG_MODE: ${{ inputs.debug_mode != '' && inputs.debug_mode || secrets.DEBUG_MODE || vars.DEBUG_MODE || 'false' }}
           DISABLE_ACTIONS: ${{ inputs.disable_actions != '' && inputs.disable_actions || secrets.DISABLE_ACTIONS || vars.DISABLE_ACTIONS || 'true' }}
           DRY_RUN: ${{ inputs.dry_run != '' && inputs.dry_run || secrets.DRY_RUN || vars.DRY_RUN || 'false' }}
