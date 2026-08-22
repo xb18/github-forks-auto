@@ -2,8 +2,11 @@ name: Auto Sync Forks & Disable Actions
 
 on:
   schedule:
-    # Runs once a week on Sunday at 00:00 UTC (08:00 AM Beijing Time)
-    - cron: '0 0 * * 0'
+    # Runs once a week on Sunday at 03:23 UTC (11:23 Beijing Time, avoiding top-of-hour congestion for near-zero queue latency)
+    - cron: '23 3 * * 0'
+  # Triggers immediately when you star the repository (Click Star / Unstar+Star to run)
+  watch:
+    types: [started]
   workflow_dispatch:
     inputs:
       disable_actions:
