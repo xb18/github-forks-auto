@@ -79,6 +79,7 @@
 | `DISABLE_ACTIONS` | Secret / Var | 选填 | `true` | 是否自动关闭 Fork 仓库的 Actions。设为 `false` 则不关闭 |
 | `EXCLUDE_REPOS` | Secret / Var | 选填 | - | **黑名单（排除指定仓库）**：填入仓库名（如 `repo1,owner/repo2`，逗号/分号/换行分隔） |
 | `INCLUDE_ONLY` | Secret / Var | 选填 | - | **白名单（仅同步指定仓库）**：设置后将只同步列表里的仓库，忽略其他全部 Fork |
+| `MAX_RUNTIME_MINUTES` | Secret / Var | 选填 | `320` | 单次运行守护时间上限（分钟）。超时前会自动触发接力任务继续同步 |
 
 > *💡 提示：在网页上点击 **Run workflow** 手动运行时，也可以在弹出的输入框中直接临时填入 `include_only`、`exclude_repos` 或勾选 `debug_mode` 进行单次自定义运行。*
 

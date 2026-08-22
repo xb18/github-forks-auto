@@ -257,7 +257,33 @@ def main() -> int:
     }
 
     total_repos_count = len(filtered_forks)
+    max_runtime_minutes = int(os.environ.get("MAX_RUNTIME_MINUTES", "320"))
+
     for idx, repo_data in enumerate(filtered_forks, start=1):
+        # Check runtime before processing next repo
+        elapsed_min = (datetime.now(timezone.utc) - start_time).total_seconds() / 60
+        if elapsed_min >= max_runtime_minutes and idx <= total_repos_count:
+            remaining_repos = total_repos_count - idx + 1
+            logger.warning(
+                f"⏰ 已达到单次运行时间守护上限 ({max_runtime_minutes} 分钟)，剩余 {remaining_repos} 个仓库。"
+                f"正在自动触发接力工作流继续执行..."
+            )
+            current_repo = os.environ.get("GITHUB_REPOSITORY")
+            current_ref = os.environ.get("GITHUB_REF_NAME", "main")
+            if current_repo:
+                relay_resp = client.post(
+                    f"/repos/{current_repo}/actions/workflows/sync_forks.yml/dispatches",
+                    json_data={"ref": current_ref},
+                )
+                if relay_resp.status_code in (200, 204):
+                    logger.info("✅ 自动接力工作流触发成功！下一轮任务将立即启动并无缝继续同步。")
+                    warnings_list.append(
+                        f"⏳ **自动接力已触发**：单次运行已达 {int(elapsed_min)} 分钟安全上限，已自动启动下一轮任务继续同步剩余 {remaining_repos} 个仓库"
+                    )
+                else:
+                    logger.error(f"❌ 触发自动接力工作流失败 ({relay_resp.status_code}): {relay_resp.text}")
+            break
+
         repo_full_name = repo_data.get("full_name", "")
         progress_pct = int((idx / total_repos_count) * 100) if total_repos_count > 0 else 100
 

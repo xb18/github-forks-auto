@@ -79,5 +79,6 @@ jobs:
           DEBUG_MODE: ${{ inputs.debug_mode != '' && inputs.debug_mode || secrets.DEBUG_MODE || vars.DEBUG_MODE || 'false' }}
           DISABLE_ACTIONS: ${{ inputs.disable_actions != '' && inputs.disable_actions || secrets.DISABLE_ACTIONS || vars.DISABLE_ACTIONS || 'true' }}
           DRY_RUN: ${{ inputs.dry_run != '' && inputs.dry_run || secrets.DRY_RUN || vars.DRY_RUN || 'false' }}
+          MAX_RUNTIME_MINUTES: ${{ vars.MAX_RUNTIME_MINUTES || secrets.MAX_RUNTIME_MINUTES || '320' }}
         run: |
           python -m src.main
