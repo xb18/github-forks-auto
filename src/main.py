@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Set
 
 from .action_disabler import disable_repo_actions
 from .client import GitHubClient
-from .feishu import send_feishu_card
+from .feishu import send_feishu_card, send_feishu_alert
 from .syncer import BranchSyncStatus, RepoSyncResult, sync_repository_branches
 
 logging.basicConfig(
@@ -153,9 +153,20 @@ def main() -> int:
         for handler in logging.root.handlers:
             handler.addFilter(privacy_filter)
 
+    feishu_webhook = config.get("feishu_webhook_url")
+    feishu_secret = config.get("feishu_secret")
+
     token = config.get("gh_pat", "")
     if not token:
-        logger.error("Error: GH_PAT or GITHUB_TOKEN environment variable is required.")
+        err_msg = "❌ **错误**: GitHub PAT 密钥 (`GH_PAT`) 未配置，导致同步任务无法执行！"
+        logger.error(err_msg)
+        if feishu_webhook:
+            send_feishu_alert(
+                webhook_url=feishu_webhook,
+                secret=feishu_secret,
+                title="🚨 GitHub Fork 同步失败：未配置 GH_PAT",
+                message=err_msg,
+            )
         return 1
 
     client = GitHubClient(token=token)
@@ -167,7 +178,15 @@ def main() -> int:
             privacy_filter.add_term(username)
         logger.info(f"Authenticated as GitHub user: @{username}")
     except Exception as exc:
+        err_msg = f"❌ **GitHub 身份鉴权失败**: {str(exc)}\n\n⚠️ **原因**: 您的 Personal Access Token (`GH_PAT`) 可能已**过期或被撤销**，导致无法访问 GitHub API。\n\n👉 请尽快重新生成 Token 并更新仓库 Secret。"
         logger.error(f"GitHub authentication error: {exc}")
+        if feishu_webhook:
+            send_feishu_alert(
+                webhook_url=feishu_webhook,
+                secret=feishu_secret,
+                title="🚨 GitHub Fork 同步失败：Token 已过期或失效",
+                message=err_msg,
+            )
         return 1
 
     logger.info("Fetching all repositories owned by user...")
@@ -263,6 +282,9 @@ def main() -> int:
             errors_list.append(f"`{repo_full_name}`: {err_msg}")
 
     end_time = datetime.now(timezone.utc)
+
+    if getattr(client, "token_expiration", None):
+        warnings_list.append(f"🔑 Token 有效期: 预计于 `{client.token_expiration}` 到期")
 
     # Output GitHub Step Summary
     debug_mode = config.get("debug_mode", False)

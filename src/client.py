@@ -122,8 +122,12 @@ class GitHubClient:
         return items
 
     def get_authenticated_user(self) -> Dict[str, Any]:
-        """Fetch current authenticated user profile."""
+        """Fetch current authenticated user profile and check token status."""
         resp = self.get("/user")
+        if resp.status_code == 401:
+            raise PermissionError("GitHub PAT Token 已失效或已过期 (401 Bad credentials)。请重新生成 Token 并更新 Secret。")
         if resp.status_code != 200:
-            raise RuntimeError(f"Authentication failed: {resp.status_code} {resp.text}")
+            raise RuntimeError(f"Authentication failed ({resp.status_code}): {resp.text}")
+
+        self.token_expiration = resp.headers.get("github-authentication-token-expiration")
         return resp.json()

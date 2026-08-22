@@ -130,3 +130,71 @@ def send_feishu_card(
     except Exception as exc:
         logger.error(f"Exception sending Feishu notification: {exc}")
         return False
+
+
+def send_feishu_alert(
+    webhook_url: str,
+    secret: Optional[str],
+    title: str,
+    message: str,
+    action_url: str = "https://github.com/settings/tokens",
+) -> bool:
+    """
+    Send an urgent alert card to Feishu webhook (e.g. for Token expired / Auth failure).
+    """
+    if not webhook_url:
+        return False
+
+    timestamp = int(time.time())
+    headers = {"Content-Type": "application/json"}
+
+    card_payload: Dict[str, Any] = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {
+                "wide_screen_mode": True,
+            },
+            "header": {
+                "title": {
+                    "tag": "plain_text",
+                    "content": title,
+                },
+                "template": "red",
+            },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": message,
+                    },
+                },
+                {"tag": "hr"},
+                {
+                    "tag": "action",
+                    "actions": [
+                        {
+                            "tag": "button",
+                            "text": {
+                                "tag": "plain_text",
+                                "content": "🔑 前往 GitHub 重新生成 Token",
+                            },
+                            "type": "danger",
+                            "url": action_url,
+                        }
+                    ],
+                },
+            ],
+        },
+    }
+
+    if secret:
+        card_payload["timestamp"] = str(timestamp)
+        card_payload["sign"] = generate_feishu_sign(secret, timestamp)
+
+    try:
+        resp = requests.post(webhook_url, json=card_payload, headers=headers, timeout=15)
+        return resp.status_code == 200 and resp.json().get("code") == 0
+    except Exception as exc:
+        logger.error(f"Exception sending Feishu alert: {exc}")
+        return False

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 
 from src.client import GitHubClient
-from src.feishu import generate_feishu_sign
+from src.feishu import generate_feishu_sign, send_feishu_alert
 from src.action_disabler import disable_repo_actions
 from src.syncer import (
     BranchSyncStatus,
@@ -208,6 +208,34 @@ class TestSyncLogic(unittest.TestCase):
 
         filter_inst.filter(record)
         self.assertEqual(record.msg, "User *** is processing *** now")
+
+    @patch("requests.post")
+    def test_send_feishu_alert(self, mock_post):
+        """Test sending urgent alert card to Feishu."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"code": 0}
+        mock_post.return_value = mock_resp
+
+        ok = send_feishu_alert(
+            webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/xxx",
+            secret="test_secret",
+            title="🚨 Test Alert",
+            message="Token has expired",
+        )
+        self.assertTrue(ok)
+        mock_post.assert_called_once()
+
+    def test_token_expiration_401(self):
+        """Test GitHubClient raising PermissionError on 401."""
+        client = GitHubClient(token="expired_token")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 401
+        client.get = MagicMock(return_value=mock_resp)
+
+        with self.assertRaises(PermissionError) as ctx:
+            client.get_authenticated_user()
+        self.assertIn("已失效或已过期", str(ctx.exception))
 
 
 if __name__ == "__main__":
