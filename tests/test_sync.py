@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 
 from src.client import GitHubClient
-from src.feishu import generate_feishu_sign, send_feishu_alert, send_feishu_card
+from src.feishu import generate_feishu_sign, send_feishu_alert, send_feishu_card, format_stats_markdown
 from src.action_disabler import disable_repo_actions
 from src.syncer import (
     BranchSyncStatus,
@@ -268,6 +268,25 @@ class TestSyncLogic(unittest.TestCase):
 
         self.assertTrue(ok)
         self.assertEqual(mock_post.call_count, 3)
+
+    def test_format_stats_markdown_custom_template(self):
+        """Test customizing report template by adding/removing fields."""
+        custom_tpl = "**精简同步快报**\n状态: {status_emoji} {status_text}\n时间: {execution_time}\n成功: {synced_branches}\n新建: {created_branches}"
+        stats = {
+            "total_repos": 10,
+            "synced_branches": 3,
+            "created_branches": 2,
+            "uptodate_branches": 5,
+            "skipped_branches": 0,
+            "actions_disabled_repos": 10,
+            "failed": 0,
+        }
+        res = format_stats_markdown(stats, "2026-08-22 10:00:00 UTC", template_str=custom_tpl)
+        self.assertIn("精简同步快报", res)
+        self.assertIn("状态: 🟢 全部正常", res)
+        self.assertIn("成功: 3", res)
+        self.assertIn("新建: 2", res)
+        self.assertNotIn("扫描 Fork 仓库总数", res)  # User removed this field from their custom template
 
 
 if __name__ == "__main__":

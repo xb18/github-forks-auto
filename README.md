@@ -122,6 +122,22 @@
 
 ---
 
+## 🎨 如何自定义飞书报告排版？
+
+仓库根目录下提供了 [`report_template.md`](report_template.md) 模板文件。您可以直接编辑该文件，自由调整文字顺序、增加小标题、修改 Emoji 或自定义排版，系统在推送时会自动填充对应变量！
+
+**支持的占位符变量**：
+- `{execution_time}`：任务执行时间
+- `{total_repos}`：扫描的 Fork 仓库总数
+- `{actions_disabled_repos}`：Actions 已禁用的仓库数
+- `{synced_branches}`：安全 Fast-Forward 同步成功的分支数
+- `{created_branches}`：从上游新建的分支数
+- `{uptodate_branches}`：保持最新的分支数
+- `{skipped_branches}`：安全跳过（分叉/硬回退保护）的分支数
+- `{failed}`：异常失败数
+
+---
+
 ## 🛠️ 本地运行与调试
 
 如果您想在本地电脑运行脚本：

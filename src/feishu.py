@@ -58,11 +58,54 @@ def chunk_list(items: List[Any], chunk_size: int) -> List[List[Any]]:
     return [items[i : i + chunk_size] for i in range(0, len(items), chunk_size)]
 
 
-def format_stats_markdown(stats: Dict[str, int], execution_time_str: str) -> str:
+import os
+
+def format_stats_markdown(
+    stats: Dict[str, int],
+    execution_time_str: str,
+    template_str: Optional[str] = None,
+    template_file: str = "report_template.md",
+) -> str:
     """
-    Format the main statistics section with clear hierarchical layout.
-    Modify this function if you want to change the order, icons, or wording of the summary card.
+    Format the main statistics section using a template file or template string.
+    Placeholders:
+      {execution_time}, {total_repos}, {actions_disabled_repos},
+      {synced_branches}, {created_branches}, {uptodate_branches},
+      {skipped_branches}, {failed}
     """
+    raw_template = template_str
+    if not raw_template and os.path.exists(template_file):
+        try:
+            with open(template_file, "r", encoding="utf-8") as f:
+                raw_template = f.read().strip()
+        except Exception as exc:
+            logger.warning(f"Failed to read template file {template_file}: {exc}")
+
+    if raw_template:
+        failed_count = stats.get("failed", 0)
+        skipped_count = stats.get("skipped_branches", 0)
+
+        status_text = "发生异常" if failed_count > 0 else ("有跳过提醒" if skipped_count > 0 else "全部正常")
+        status_emoji = "🔴" if failed_count > 0 else ("🟡" if skipped_count > 0 else "🟢")
+
+        replacements = {
+            "execution_time": execution_time_str,
+            "total_repos": str(stats.get("total_repos", 0)),
+            "actions_disabled_repos": str(stats.get("actions_disabled_repos", 0)),
+            "synced_branches": str(stats.get("synced_branches", 0)),
+            "created_branches": str(stats.get("created_branches", 0)),
+            "uptodate_branches": str(stats.get("uptodate_branches", 0)),
+            "skipped_branches": str(stats.get("skipped_branches", 0)),
+            "failed": str(failed_count),
+            "status_text": status_text,
+            "status_emoji": status_emoji,
+        }
+        res = raw_template
+        for key, val in replacements.items():
+            res = res.replace(f"{{{key}}}", val)
+        return res
+
+    # Default fallback layout
     lines = [
         f"**⏰ 执行时间**: {execution_time_str}",
         "",
@@ -92,6 +135,7 @@ def send_feishu_card(
     errors: List[str],
     execution_time_str: str,
     batch_size: int = 15,
+    template_str: Optional[str] = None,
 ) -> bool:
     """
     Send an interactive card notification to Feishu custom bot webhook.
@@ -104,7 +148,7 @@ def send_feishu_card(
     header_color = "red" if (len(errors) > 0 or stats.get("failed", 0) > 0) else ("orange" if len(warnings) > 0 else "blue")
 
     # Build structured markdown content for statistics
-    stats_md = format_stats_markdown(stats, execution_time_str)
+    stats_md = format_stats_markdown(stats, execution_time_str, template_str=template_str)
 
     # Chunk warnings and errors
     warn_chunks = chunk_list(warnings, batch_size) if warnings else []
