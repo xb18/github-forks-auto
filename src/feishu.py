@@ -167,19 +167,19 @@ def format_stats_markdown(
     lines = [
         f"**⏰ 执行时间**: {execution_time_str}",
         "",
-        "**📦 仓库处理概览**",
-        f"• 扫描 Fork 仓库总数: **{stats.get('total_repos', 0)}** 个",
-        f"• Actions 已禁用仓库: **{stats.get('actions_disabled_repos', 0)}** 个",
+        "**📦 仓库概览**",
+        f"- 扫描 Fork 仓库: **{stats.get('total_repos', 0)}** 个",
+        f"- Actions 已禁用: **{stats.get('actions_disabled_repos', 0)}** 个",
         "",
         "**🌿 分支变动明细**",
-        f"• ⚡ 安全快进同步: **{stats.get('synced_branches', 0)}** 个分支",
-        f"• 🌱 上游新建分支: **{stats.get('created_branches', 0)}** 个分支",
-        f"• ✅ 保持最新状态: **{stats.get('uptodate_branches', 0)}** 个分支",
-        f"• 🛡️ 安全跳过保护: **{stats.get('skipped_branches', 0)}** 个分支",
+        f"- ⚡ 快进同步: **{stats.get('synced_branches', 0)}** 个分支",
+        f"- 🌱 新建分支: **{stats.get('created_branches', 0)}** 个分支",
+        f"- ✅ 保持最新: **{stats.get('uptodate_branches', 0)}** 个分支",
+        f"- 🛡️ 跳过保护: **{stats.get('skipped_branches', 0)}** 个分支",
     ]
 
     if failed_count > 0:
-        lines.append(f"• ❌ 同步异常失败: **{failed_count}** 个")
+        lines.append(f"- ❌ 异常失败: **{failed_count}** 个")
 
     return "\n".join(lines)
 
