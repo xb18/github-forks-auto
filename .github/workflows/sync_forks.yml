@@ -2,7 +2,18 @@ name: Auto Sync Forks & Disable Actions
 
 on:
   schedule:
-    # Runs once a week on Sunday at 03:23 UTC (11:23 Beijing Time, avoiding top-of-hour congestion for near-zero queue latency)
+    # =========================================================================
+    # ⏰【定时修改指南】在此处修改执行频率：
+    # 格式: 分(0-59) 时(0-23 UTC) 日(1-31) 月(1-12) 星期(0-6, 0为周日)
+    #
+    # 常用示例 (UTC 时间 +8 为北京时间):
+    # - '23 3 * * 0'     # 每周日 03:23 UTC（北京时间每周日 11:23）【当前默认】
+    # - '23 3 * * 1,5'   # 每周一和周五各运行一次
+    # - '23 3 */3 * *'   # 每 3 天运行一次
+    # - '23 3 * * *'     # 每天运行一次（北京时间 11:23）
+    # - '23 */6 * * *'   # 每 6 小时运行一次
+    # - '23 3 1 * *'     # 每月 1 号运行一次
+    # =========================================================================
     - cron: '23 3 * * 0'
   # Triggers immediately when you star the repository (Click Star / Unstar+Star to run)
   watch:
