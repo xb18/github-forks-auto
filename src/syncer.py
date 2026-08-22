@@ -251,8 +251,11 @@ def sync_repository_branches(
         return result
 
     # Iterate through all upstream branches and sync
-    for branch_name, upstream_sha in upstream_branches.items():
+    branch_items = list(upstream_branches.items())
+    total_b = len(branch_items)
+    for b_idx, (branch_name, upstream_sha) in enumerate(branch_items, start=1):
         fork_sha = fork_branches.get(branch_name)
+        logger.info(f"  🌿 [分支 {b_idx}/{total_b}] 处理分支 '{branch_name}'...")
         b_res = sync_single_branch(
             client=client,
             fork_full_name=fork_full_name,

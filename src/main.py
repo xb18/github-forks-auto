@@ -252,9 +252,14 @@ def main() -> int:
         "failed": 0,
     }
 
+    total_repos_count = len(filtered_forks)
     for idx, repo_data in enumerate(filtered_forks, start=1):
         repo_full_name = repo_data.get("full_name", "")
-        logger.info(f"\n[{idx}/{len(filtered_forks)}] Processing repository: {repo_full_name}")
+        progress_pct = int((idx / total_repos_count) * 100) if total_repos_count > 0 else 100
+
+        logger.info(f"\n" + "-" * 60)
+        logger.info(f"🔄 [进度: {idx}/{total_repos_count} ({progress_pct}%)] 正在处理仓库: {repo_full_name}")
+        logger.info("-" * 60)
 
         if privacy_filter and repo_data.get("parent"):
             privacy_filter.add_term(repo_data["parent"].get("full_name", ""))
@@ -298,6 +303,12 @@ def main() -> int:
             err_msg = f"Unexpected exception: {str(exc)}"
             results.append(RepoSyncResult(repo_name=repo_full_name, error_message=err_msg))
             errors_list.append(f"`{repo_full_name}`: {err_msg}")
+
+        logger.info(
+            f"✅ [进度: {idx}/{total_repos_count}] {repo_full_name} 处理完毕 | "
+            f"累计: 同步成功 {stats['synced_branches']}, 新建 {stats['created_branches']}, "
+            f"最新 {stats['uptodate_branches']}, 跳过 {stats['skipped_branches']}, 失败 {stats['failed']}"
+        )
 
     end_time = datetime.now(timezone.utc)
 
