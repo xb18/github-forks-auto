@@ -21,25 +21,44 @@
 
 ---
 
-## 🚀 部署与使用指南 (GitHub Actions 零服务器部署)
+## 🚀 部署与使用指南 (Fork 即可直接使用)
 
-### 步骤 1：创建并配置 GitHub Personal Access Token (PAT)
+### 🍴 如何 Fork 本项目为你所用（4 步极速上手）：
 
-由于需要访问和更新您账号下的所有 Fork 仓库并设置 Actions 权限，需要创建一个 PAT：
-
-1. 登录 GitHub，点击右上角头像 -> **Settings** -> **Developer Settings** -> **Personal access tokens** -> **Tokens (classic)**。
-2. 点击 **Generate new token (classic)**。
-3. 勾选权限：
-   - `repo`（完整控制私有与公开仓库、读写分支、Commit）
-   - `workflow`（更新工作流）
-   - `admin:repo_hook`（或具备修改仓库 Settings 权限）
-4. 点击 **Generate token** 并复制保存 Token（例如：`ghp_xxxx`）。
+1. **Fork 本仓库**：
+   - 点击本页面右上角的 **`Fork`** 按钮，将本仓库 Fork 到你自己的 GitHub 账号下。
+2. **启用 Fork 仓库的 Actions**：
+   - 进入你 Fork 后的新仓库页面，点击顶部的 **Actions** 标签页。
+   - 点击绿色按钮 **`I understand my workflows, go ahead and enable them`** 启用工作流。
+3. **配置个人访问令牌 (PAT) Secret**：
+   - 点击当前仓库的 **Settings** -> **Secrets and variables** -> **Actions**。
+   - 在 **Repository secrets** 下点击 **New repository secret**：
+     - **Name**: `GH_PAT`
+     - **Secret**: 填入你自己的 GitHub Personal Access Token（需要包含 `repo` 权限，生成方式见下方说明）。
+4. **一键触发运行**：
+   - 在你 Fork 的仓库右上角点亮 **Star ⭐**，或者在 **Actions** 页面手动点击 **Run workflow**，即可立即开始第一次全量自动同步！
 
 ---
 
-### 步骤 2：在本项目仓库中配置 GitHub Secrets
+### 🔑 详细配置步骤
 
-将本项目代码推送到您的 GitHub 私有或公开仓库中，进入仓库页面：
+#### 步骤 1：创建 GitHub Personal Access Token (PAT)
+
+由于需要访问和更新你账号下的所有 Fork 仓库并管理 Actions 权限，需要创建一个 PAT：
+
+1. 登录 GitHub，点击右上角头像 -> **Settings** -> **Developer Settings** -> **Personal access tokens** -> **Tokens (classic)**。
+2. 点击 **Generate new token (classic)**。
+3. **Expiration**：建议选择 `No expiration`（无过期）。
+4. **Scopes 勾选权限**：
+   - ✅ `repo`（完整控制私有与公开仓库、读写分支、Commit）
+   - ✅ `workflow`（更新包含工作流的仓库）
+5. 点击 **Generate token** 并复制保存 Token（例如：`ghp_xxxx`）。
+
+---
+
+#### 步骤 2：在仓库中配置 GitHub Secrets
+
+进入你 Fork 后的仓库页面：
 1. 点击 **Settings** -> **Secrets and variables** -> **Actions**。
 2. 在 **Repository secrets** 中点击 **New repository secret**，添加以下密钥：
 
