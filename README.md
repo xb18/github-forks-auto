@@ -1,6 +1,8 @@
-# GitHub Forks Auto Sync & Management (全量/全分支/安全防丢/飞书通知)
+# GitHub Forks Auto Sync & Management (全量/全分支/安全防丢/飞书与邮件通知/i18n)
 
-自动同步 GitHub 账号下所有 Fork 仓库的所有分支（包括上游新增分支），自动禁用 Fork 仓库的 GitHub Actions，并在执行完成后向飞书机器人发送卡片通知。
+[简体中文](README.md) | [English](README.en.md)
+
+自动同步 GitHub 账号下所有 Fork 仓库的所有分支（包括上游新增分支），自动禁用 Fork 仓库的 GitHub Actions，并在执行完成后向**飞书机器人**和**邮箱**发送通知。支持多语言国际化 (i18n)。
 
 ---
 
@@ -15,7 +17,10 @@
   - 若您在 Fork 仓库中有自己独有的提交（Diverged / Ahead），自动跳过同步，保护您的开发成果。
   - 若上游仓库/分支被删除（404/422），优雅跳过并标记。
 - 🚫 **自动禁用 Actions**：一键在仓库级别禁用每个 Fork 仓库的 GitHub Actions（`enabled: false`），彻底避免消耗 Actions 运行额度及误跑 CI/CD。
-- 📨 **飞书机器人通知**：运行完成后自动推送精美的**飞书交互式消息卡片 (Interactive Card)**，包含同步汇总及异常/跳过明细（支持签名校验）。
+- 📨 **多渠道通知推送**：
+  - **飞书机器人**：运行完成后自动推送精美的**飞书交互式消息卡片 (Interactive Card)**（支持签名校验）。
+  - **SMTP 邮箱推送**：支持 QQ 邮箱、163 网易邮箱、Gmail、Outlook、企业邮箱等，推送响应式 HTML 报告邮件。
+- 🌐 **多语言国际化 (i18n)**：支持中文 (`zh`) 与英文 (`en`)，包括日志输出、Step Summary、飞书卡片与邮件通知。
 - 📊 **Actions 概况报告**：自动在 GitHub Actions 运行页面生成 Markdown Step Summary 统计表格。
 - ⚙️ **黑/白名单过滤**：支持指定排除（`EXCLUDE_REPOS`）或仅同步特定仓库（`INCLUDE_ONLY`）。
 
@@ -73,15 +78,22 @@
 | 配置项 (Secret / Variable) | 类型 | 是否必填 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `GH_PAT` | Secret | **必填** | - | 步骤 1 生成的 GitHub PAT（Classic 勾选 `repo` 与 `workflow`） |
+| `LANGUAGE` | Secret / Var | 选填 | `zh` | 界面与通知语言，可选 `zh`（中文）或 `en`（英文） |
 | `FEISHU_WEBHOOK_URL` | Secret | 选填 | - | 飞书自定义机器人的 Webhook 地址 |
 | `FEISHU_SECRET` | Secret | 选填 | - | 飞书机器人的安全设置签名校验密钥（若开启） |
+| `SMTP_HOST` | Secret / Var | 选填 | - | SMTP 邮件服务器地址（如 `smtp.qq.com`, `smtp.163.com`, `smtp.gmail.com`） |
+| `SMTP_PORT` | Secret / Var | 选填 | `465` / `587` | SMTP 端口（465 对应 SSL，587 对应 STARTTLS） |
+| `SMTP_USER` | Secret / Var | 选填 | - | 发件人邮箱账号（如 `your_email@qq.com`） |
+| `SMTP_PASS` | Secret | 选填 | - | 发件人邮箱密码或 SMTP 授权码（如 QQ邮箱 / 163 的客户端授权密码） |
+| `SMTP_TO` | Secret / Var | 选填 | 同 `SMTP_USER` | 收件人邮箱（支持多个邮箱，逗号分隔） |
+| `SMTP_FROM_NAME` | Secret / Var | 选填 | `GitHub Forks Auto` | 邮件中显示的发件人名称 |
 | `DEBUG_MODE` | Secret / Var | 选填 | `false` | 设为 `true` 开启 Debug 详细日志模式并在 Actions 页面输出明细表格 |
 | `DISABLE_ACTIONS` | Secret / Var | 选填 | `true` | 是否自动关闭 Fork 仓库的 Actions。设为 `false` 则不关闭 |
 | `EXCLUDE_REPOS` | Secret / Var | 选填 | - | **黑名单（排除指定仓库）**：填入仓库名（如 `repo1,owner/repo2`，逗号/分号/换行分隔） |
 | `INCLUDE_ONLY` | Secret / Var | 选填 | - | **白名单（仅同步指定仓库）**：设置后将只同步列表里的仓库，忽略其他全部 Fork |
 | `MAX_RUNTIME_MINUTES` | Secret / Var | 选填 | `320` | 单次运行守护时间上限（分钟）。超时前会自动触发接力任务继续同步 |
 
-> *💡 提示：在网页上点击 **Run workflow** 手动运行时，也可以在弹出的输入框中直接临时填入 `include_only`、`exclude_repos` 或勾选 `debug_mode` 进行单次自定义运行。*
+> *💡 提示：在网页上点击 **Run workflow** 手动运行时，也可以在弹出的输入框中直接选择语言、临时填入 `include_only`、`exclude_repos` 或勾选 `debug_mode` 进行单次自定义运行。*
 
 ##### 📝 仓库名单填写格式说明（黑白名单通用）：
 - **短名与全名皆可**：
@@ -98,12 +110,31 @@
 
 ---
 
-### 步骤 3：配置飞书自定义机器人（可选）
+### 步骤 3：配置通知渠道（可选）
 
+#### 选项 A：飞书自定义机器人
 1. 在飞书群组中，点击右上角 **设置** -> **机器人** -> **添加机器人** -> 选择 **自定义机器人**。
 2. 设置机器人名称（例如：`GitHub 同步助手`）。
 3. 复制生成的 **Webhook 地址** 并填入 GitHub Secret `FEISHU_WEBHOOK_URL`。
 4. （可选）勾选 **签名校验**，复制密钥并填入 GitHub Secret `FEISHU_SECRET`。
+
+#### 选项 B：邮箱推送 (SMTP)
+常见邮箱配置参考：
+- **QQ 邮箱**：
+  - `SMTP_HOST`: `smtp.qq.com`
+  - `SMTP_PORT`: `465`
+  - `SMTP_USER`: `你的QQ邮箱@qq.com`
+  - `SMTP_PASS`: 在 QQ 邮箱网页端「设置 -> 账户 -> POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务」生成的**授权码**。
+- **163 网易邮箱**：
+  - `SMTP_HOST`: `smtp.163.com`
+  - `SMTP_PORT`: `465`
+  - `SMTP_USER`: `你的网易邮箱@163.com`
+  - `SMTP_PASS`: 163 邮箱网页端「设置 -> POP3/SMTP/IMAP」生成的客户端**授权密码**。
+- **Gmail**：
+  - `SMTP_HOST`: `smtp.gmail.com`
+  - `SMTP_PORT`: `587` 或 `465`
+  - `SMTP_USER`: `your_email@gmail.com`
+  - `SMTP_PASS`: Google 账号开启两步验证后生成的 **App Password（应用专用密码）**。
 
 ---
 
@@ -115,7 +146,7 @@
 - **手动界面触发**：
   1. 进入仓库的 **Actions** 页面。
   2. 点击左侧的 **Auto Sync Forks & Disable Actions** 工作流。
-  3. 点击右侧 **Run workflow** 按钮即可一键立即执行。
+  3. 点击右侧 **Run workflow** 按钮即可一键立即执行（支持临时选择语言、白名单等）。
 
 #### ⏰ 如何修改定时频率？
 打开 [`.github/workflows/sync_forks.yml`](.github/workflows/sync_forks.yml) 文件，修改 `cron: '...'` 一行：
@@ -131,9 +162,9 @@
 
 ---
 
-## 🎨 如何自定义飞书报告排版？
+## 🎨 如何自定义通知报告排版？
 
-仓库根目录下提供了 [`report_template.md`](report_template.md) 模板文件。您可以直接编辑该文件，自由调整文字顺序、增加小标题、修改 Emoji 或自定义排版，系统在推送时会自动填充对应变量！
+仓库根目录下提供了中文模板 [`report_template.md`](report_template.md) 和英文模板 [`report_template.en.md`](report_template.en.md)。您可以直接编辑对应的模板文件，自由调整文字顺序、增加小标题、修改 Emoji 或自定义排版，系统在推送时会自动填充对应变量！
 
 **支持的占位符变量**：
 - `{execution_time}`：任务执行时间
@@ -164,8 +195,14 @@ pip install -r requirements.txt
 
 # 2. 设置环境变量并运行
 export GH_PAT="ghp_your_personal_access_token"
+export LANGUAGE="zh" # 或 export LANGUAGE="en"
 export FEISHU_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
-# export FEISHU_SECRET="your_secret"
+
+# 配置邮箱推送（可选）
+export SMTP_HOST="smtp.qq.com"
+export SMTP_PORT="465"
+export SMTP_USER="your_email@qq.com"
+export SMTP_PASS="your_auth_code"
 
 python -m src.main
 ```
@@ -173,6 +210,7 @@ python -m src.main
 Windows PowerShell:
 ```powershell
 $env:GH_PAT="ghp_your_personal_access_token"
+$env:LANGUAGE="zh"
 $env:FEISHU_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
 python -m src.main
 ```
@@ -200,5 +238,5 @@ flowchart TD
     FastForward --> Summary
     SafeSkip --> Summary
     KeepLocal --> Summary
-    Summary --> Feishu[推送飞书卡片 & GitHub Step Summary]
+    Summary --> Notify[推送飞书卡片 / 邮件 / GitHub Step Summary]
 ```

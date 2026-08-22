@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 from .client import GitHubClient
+from .i18n import t
 
 logger = logging.getLogger("syncer")
 
@@ -97,12 +98,12 @@ def sync_single_branch(
             return BranchResult(
                 branch_name=branch_name,
                 status=BranchSyncStatus.CREATED,
-                message="Created new branch from upstream",
+                message=t("branch_created"),
                 fork_sha=None,
                 upstream_sha=upstream_sha,
             )
         else:
-            err = f"Failed to create branch: {create_resp.status_code} {create_resp.text}"
+            err = t("branch_create_failed", status=create_resp.status_code, detail=create_resp.text)
             logger.warning(f"[{fork_full_name}] {err}")
             return BranchResult(
                 branch_name=branch_name,
@@ -117,7 +118,7 @@ def sync_single_branch(
         return BranchResult(
             branch_name=branch_name,
             status=BranchSyncStatus.UP_TO_DATE,
-            message="Already up-to-date",
+            message=t("branch_up_to_date"),
             fork_sha=fork_sha,
             upstream_sha=upstream_sha,
         )
@@ -125,7 +126,7 @@ def sync_single_branch(
     # Case 3: Both exist but have different commit SHAs -> Compare ancestry for safe Fast-Forward
     compare_resp = client.get(f"/repos/{fork_full_name}/compare/{fork_sha}...{upstream_sha}")
     if compare_resp.status_code != 200:
-        err = f"Compare API failed ({compare_resp.status_code}): {compare_resp.text}"
+        err = t("branch_compare_failed", status=compare_resp.status_code, detail=compare_resp.text)
         logger.warning(f"[{fork_full_name}:{branch_name}] {err}")
         return BranchResult(
             branch_name=branch_name,
@@ -158,12 +159,12 @@ def sync_single_branch(
             return BranchResult(
                 branch_name=branch_name,
                 status=BranchSyncStatus.SYNCED,
-                message=f"Fast-forwarded +{ahead_by} commits",
+                message=t("branch_fast_forward", count=ahead_by),
                 fork_sha=fork_sha,
                 upstream_sha=upstream_sha,
             )
         else:
-            err = f"Update ref failed ({patch_resp.status_code}): {patch_resp.text}"
+            err = t("branch_update_failed", status=patch_resp.status_code, detail=patch_resp.text)
             logger.warning(f"[{fork_full_name}:{branch_name}] {err}")
             return BranchResult(
                 branch_name=branch_name,
@@ -175,9 +176,7 @@ def sync_single_branch(
 
     # If status is diverged -> Upstream history rewritten or user has custom commits
     elif compare_status == "diverged":
-        warn_msg = (
-            f"Diverged 分叉保护 (Fork 领先 {behind_by}，落后 {ahead_by})：上游可能存在硬回退(Force Push)或本地有独立提交，已跳过防丢失代码"
-        )
+        warn_msg = t("branch_diverged", behind_by=behind_by, ahead_by=ahead_by)
         logger.warning(f"[{fork_full_name}:{branch_name}] 🛡️ {warn_msg}")
         return BranchResult(
             branch_name=branch_name,
@@ -189,7 +188,7 @@ def sync_single_branch(
 
     # If fork is ahead of upstream
     elif compare_status == "behind":
-        msg = f"Fork 本地领先上游 {behind_by} 个提交 (保留本地独有代码)，已跳过同步"
+        msg = t("branch_fork_ahead", behind_by=behind_by)
         logger.info(f"[{fork_full_name}:{branch_name}] {msg}")
         return BranchResult(
             branch_name=branch_name,
@@ -200,7 +199,7 @@ def sync_single_branch(
         )
 
     else:
-        warn_msg = f"Unusual compare status '{compare_status}' (ahead: {ahead_by}, behind: {behind_by}). Skipped."
+        warn_msg = t("branch_unusual_status", compare_status=compare_status, ahead_by=ahead_by, behind_by=behind_by)
         logger.warning(f"[{fork_full_name}:{branch_name}] {warn_msg}")
         return BranchResult(
             branch_name=branch_name,
@@ -225,7 +224,7 @@ def sync_repository_branches(
     # Verify if it's a fork
     if not repo_data.get("fork", False):
         result.is_fork = False
-        result.error_message = "Not a fork repository"
+        result.error_message = t("branch_not_a_fork")
         return result
 
     # Check upstream parent information
@@ -238,7 +237,7 @@ def sync_repository_branches(
             parent = repo_detail.get("parent")
 
     if not parent:
-        result.error_message = "Parent/upstream repository not found (it might have been deleted or fork detached)"
+        result.error_message = t("branch_parent_not_found")
         logger.warning(f"[{fork_full_name}] {result.error_message}")
         return result
 
@@ -252,19 +251,19 @@ def sync_repository_branches(
     try:
         upstream_branches = get_repo_branches(client, upstream_full_name)
     except Exception as exc:
-        result.error_message = f"Failed to fetch upstream branches ({upstream_full_name}): {exc}"
+        result.error_message = t("branch_fetch_failed", detail=f"{upstream_full_name}: {exc}")
         logger.error(f"[{fork_full_name}] {result.error_message}")
         return result
 
     if not upstream_branches:
-        result.error_message = f"Upstream repository '{upstream_full_name}' returned no accessible branches."
+        result.error_message = t("branch_upstream_empty", upstream=upstream_full_name)
         logger.warning(f"[{fork_full_name}] {result.error_message}")
         return result
 
     try:
         fork_branches = get_repo_branches(client, fork_full_name)
     except Exception as exc:
-        result.error_message = f"Failed to fetch fork branches ({fork_full_name}): {exc}"
+        result.error_message = t("branch_fetch_failed", detail=f"{fork_full_name}: {exc}")
         logger.error(f"[{fork_full_name}] {result.error_message}")
         return result
 
@@ -276,7 +275,7 @@ def sync_repository_branches(
         if debug_mode:
             logger.info(f"  🌿 [分支 {b_idx}/{total_b}] 处理分支 '{branch_name}'...")
         else:
-            logger.info(f"  🌿 正在比对分支...")
+            logger.info(t("log_comparing_branch"))
         b_res = sync_single_branch(
             client=client,
             fork_full_name=fork_full_name,

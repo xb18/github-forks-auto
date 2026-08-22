@@ -3,13 +3,16 @@
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Set
 
 from .action_disabler import disable_repo_actions
 from .client import GitHubClient
-from .feishu import send_feishu_card, send_feishu_alert
+from .email_notifier import send_email_alert, send_email_notification
+from .feishu import send_feishu_alert, send_feishu_card
+from .i18n import get_current_language, set_language, t
 from .syncer import BranchSyncStatus, RepoSyncResult, sync_repository_branches
 
 logging.basicConfig(
@@ -41,8 +44,6 @@ class StandardLogFilter(logging.Filter):
         return True
 
 
-import re
-
 def parse_repo_list(val: Any) -> List[str]:
     """Parse comma/semicolon/space/newline separated string or list of repository names."""
     if isinstance(val, list):
@@ -58,6 +59,15 @@ def load_config() -> Dict[str, Any]:
         "gh_pat": os.environ.get("GH_PAT") or os.environ.get("GITHUB_TOKEN", ""),
         "feishu_webhook_url": os.environ.get("FEISHU_WEBHOOK_URL", ""),
         "feishu_secret": os.environ.get("FEISHU_SECRET", ""),
+        "smtp_host": os.environ.get("SMTP_HOST") or os.environ.get("SMTP_SERVER", ""),
+        "smtp_port": os.environ.get("SMTP_PORT", ""),
+        "smtp_user": os.environ.get("SMTP_USER") or os.environ.get("SMTP_USERNAME", ""),
+        "smtp_pass": os.environ.get("SMTP_PASS") or os.environ.get("SMTP_PASSWORD") or os.environ.get("SMTP_AUTH_CODE", ""),
+        "smtp_to": os.environ.get("SMTP_TO") or os.environ.get("EMAIL_TO", ""),
+        "smtp_from_name": os.environ.get("SMTP_FROM_NAME", "GitHub Forks Auto"),
+        "smtp_ssl": None,
+        "smtp_tls": None,
+        "language": os.environ.get("LANGUAGE") or os.environ.get("LANG") or os.environ.get("LOCALE") or "zh",
         "exclude_repos": [],
         "include_only": [],
         "disable_actions": os.environ.get("DISABLE_ACTIONS", "true").lower() in ("true", "1", "yes"),
@@ -76,6 +86,13 @@ def load_config() -> Dict[str, Any]:
             logger.warning(f"Failed to read {config_file}: {exc}")
 
     # Environment variables override
+    if os.environ.get("LANGUAGE"):
+        config["language"] = os.environ.get("LANGUAGE")
+    elif os.environ.get("LOCALE"):
+        config["language"] = os.environ.get("LOCALE")
+
+    set_language(config.get("language", "zh"))
+
     env_exclude = os.environ.get("EXCLUDE_REPOS")
     if env_exclude:
         config["exclude_repos"] = parse_repo_list(env_exclude)
@@ -97,57 +114,58 @@ def generate_step_summary(
     start_time: datetime,
     end_time: datetime,
     debug_mode: bool = False,
+    lang: str = "zh",
 ) -> str:
     """Generate GitHub Step Summary Markdown string."""
     duration = (end_time - start_time).total_seconds()
     time_str = start_time.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     lines = [
-        "## 🔄 GitHub Fork 仓库全量同步与管理报告",
-        f"**执行时间**: `{time_str}` | **总耗时**: `{duration:.1f}s`",
+        t("summary_workflow_title", lang=lang),
+        t("summary_time_header", lang=lang, time_str=time_str, duration=duration),
         "",
-        "### 📊 同步概况统计",
-        "| 指标 | 数量 |",
+        t("summary_stats_header", lang=lang),
+        f"| {t('summary_metric_col', lang=lang)} | {t('summary_count_col', lang=lang)} |",
         "| :--- | :--- |",
-        f"| 📦 扫描 Fork 仓库总数 | **{stats.get('total_repos', 0)}** |",
-        f"| ⚡ 分支同步成功 (Fast-Forward) | **{stats.get('synced_branches', 0)}** |",
-        f"| 🌱 上游新增分支创建 | **{stats.get('created_branches', 0)}** |",
-        f"| ✅ 已是最新状态分支 | **{stats.get('uptodate_branches', 0)}** |",
-        f"| 🛡️ 安全跳过 (分叉/硬回退保护) | **{stats.get('skipped_branches', 0)}** |",
-        f"| 🚫 Actions 已禁用仓库 | **{stats.get('actions_disabled_repos', 0)}** |",
-        f"| ❌ 异常/失败 | **{stats.get('failed', 0)}** |",
+        f"| {t('summary_total_repos', lang=lang)} | **{stats.get('total_repos', 0)}** |",
+        f"| {t('summary_synced_branches', lang=lang)} | **{stats.get('synced_branches', 0)}** |",
+        f"| {t('summary_created_branches', lang=lang)} | **{stats.get('created_branches', 0)}** |",
+        f"| {t('summary_uptodate_branches', lang=lang)} | **{stats.get('uptodate_branches', 0)}** |",
+        f"| {t('summary_skipped_branches', lang=lang)} | **{stats.get('skipped_branches', 0)}** |",
+        f"| {t('summary_disabled_actions', lang=lang)} | **{stats.get('actions_disabled_repos', 0)}** |",
+        f"| {t('summary_failed', lang=lang)} | **{stats.get('failed', 0)}** |",
         "",
     ]
 
     if not debug_mode:
-        lines.append("> ℹ️ **当前为标准日志模式**：仅展示统计总览。如需在 GitHub 页面公开显示每个仓库的详细处理明细表格，请开启 Secret `DEBUG_MODE=true`。详细明细已同步推送至飞书。")
+        lines.append(t("summary_standard_mode_note", lang=lang))
         lines.append("")
         return "\n".join(lines)
 
     lines.extend([
-        "### 📝 仓库处理明细 (Debug Mode)",
-        "| 仓库名称 | 上游仓库 | 分支 | 状态 | 详细信息 |",
+        t("summary_debug_table_header", lang=lang),
+        f"| {t('summary_table_repo', lang=lang)} | {t('summary_table_upstream', lang=lang)} | {t('summary_table_branch', lang=lang)} | {t('summary_table_status', lang=lang)} | {t('summary_table_details', lang=lang)} |",
         "| :--- | :--- | :--- | :--- | :--- |",
     ])
 
     for r in results:
         upstream_display = r.upstream_name or "N/A"
         if r.error_message:
-            lines.append(f"| `{r.repo_name}` | `{upstream_display}` | `-` | ❌ 错误 | {r.error_message} |")
+            lines.append(f"| `{r.repo_name}` | `{upstream_display}` | `-` | {t('status_label_error', lang=lang)} | {r.error_message} |")
             continue
 
         if not r.branch_results:
-            lines.append(f"| `{r.repo_name}` | `{upstream_display}` | `-` | ⚠️ 无分支 | 未检测到可同步分支 |")
+            lines.append(f"| `{r.repo_name}` | `{upstream_display}` | `-` | {t('status_label_no_branches', lang=lang)} | {t('branch_no_branches_detected', lang=lang)} |")
             continue
 
         for b in r.branch_results:
             status_icon = {
-                BranchSyncStatus.SYNCED: "⚡ 已同步",
-                BranchSyncStatus.CREATED: "🌱 新建分支",
-                BranchSyncStatus.UP_TO_DATE: "✅ 已最新",
-                BranchSyncStatus.SKIPPED_DIVERGED: "🛡️ 分叉跳过",
-                BranchSyncStatus.SKIPPED_FORK_AHEAD: "🛡️ 本地领先",
-                BranchSyncStatus.ERROR: "❌ 失败",
+                BranchSyncStatus.SYNCED: t("status_label_synced", lang=lang),
+                BranchSyncStatus.CREATED: t("status_label_created", lang=lang),
+                BranchSyncStatus.UP_TO_DATE: t("status_label_uptodate", lang=lang),
+                BranchSyncStatus.SKIPPED_DIVERGED: t("status_label_skipped_diverged", lang=lang),
+                BranchSyncStatus.SKIPPED_FORK_AHEAD: t("status_label_skipped_ahead", lang=lang),
+                BranchSyncStatus.ERROR: t("status_label_error", lang=lang),
             }.get(b.status, str(b.status.value))
 
             msg_clean = b.message.replace("|", "/")
@@ -160,6 +178,7 @@ def generate_step_summary(
 def main() -> int:
     start_time = datetime.now(timezone.utc)
     config = load_config()
+    current_lang = get_current_language()
     debug_mode = config.get("debug_mode", False)
 
     log_filter = None
@@ -173,15 +192,22 @@ def main() -> int:
 
     token = config.get("gh_pat", "")
     if not token:
-        err_msg = "❌ **错误**: GitHub PAT 密钥 (`GH_PAT`) 未配置，导致同步任务无法执行！"
+        err_msg = t("log_missing_pat", lang=current_lang)
         logger.error(err_msg)
         if feishu_webhook:
             send_feishu_alert(
                 webhook_url=feishu_webhook,
                 secret=feishu_secret,
-                title="🚨 GitHub Fork 同步失败：未配置 GH_PAT",
+                title=t("feishu_alert_title_missing_pat", lang=current_lang),
                 message=err_msg,
+                lang=current_lang,
             )
+        send_email_alert(
+            smtp_config=config,
+            title=t("email_alert_subject_missing_pat", lang=current_lang),
+            message=err_msg,
+            lang=current_lang,
+        )
         return 1
 
     client = GitHubClient(token=token)
@@ -191,20 +217,27 @@ def main() -> int:
         username = user_info.get("login", "Unknown")
         if log_filter:
             log_filter.add_term(username)
-        logger.info(f"Authenticated as GitHub user: @{username}")
+        logger.info(t("log_authenticated", lang=current_lang, username=username))
     except Exception as exc:
-        err_msg = f"❌ **GitHub 身份鉴权失败**: {str(exc)}\n\n⚠️ **原因**: 您的 Personal Access Token (`GH_PAT`) 可能已**过期或被撤销**，导致无法访问 GitHub API。\n\n👉 请尽快重新生成 Token 并更新仓库 Secret。"
+        err_msg = t("log_auth_failed", lang=current_lang, exc=str(exc))
         logger.error(f"GitHub authentication error: {exc}")
         if feishu_webhook:
             send_feishu_alert(
                 webhook_url=feishu_webhook,
                 secret=feishu_secret,
-                title="🚨 GitHub Fork 同步失败：Token 已过期或失效",
+                title=t("feishu_alert_title_auth", lang=current_lang),
                 message=err_msg,
+                lang=current_lang,
             )
+        send_email_alert(
+            smtp_config=config,
+            title=t("email_alert_subject_auth", lang=current_lang),
+            message=err_msg,
+            lang=current_lang,
+        )
         return 1
 
-    logger.info("Fetching all repositories owned by user...")
+    logger.info(t("log_fetching_repos", lang=current_lang))
     repos = client.get_paginated("/user/repos", params={"type": "owner", "sort": "full_name"})
     
     if log_filter:
@@ -240,7 +273,7 @@ def main() -> int:
         logger.info(f"Found {len(repos)} total owned repos, {len(fork_repos)} are forked repositories.")
         logger.info(f"Total forked repos to process: {len(filtered_forks)}")
     else:
-        logger.info("已成功获取 Fork 仓库列表，准备开始同步...")
+        logger.info(t("log_forks_fetched_std", lang=current_lang))
 
     results: List[RepoSyncResult] = []
     warnings_list: List[str] = []
@@ -265,8 +298,7 @@ def main() -> int:
         if elapsed_min >= max_runtime_minutes and idx <= total_repos_count:
             remaining_repos = total_repos_count - idx + 1
             logger.warning(
-                f"⏰ 已达到单次运行时间守护上限 ({max_runtime_minutes} 分钟)，剩余 {remaining_repos} 个仓库。"
-                f"正在自动触发接力工作流继续执行..."
+                t("log_relay_triggered", lang=current_lang, max_minutes=max_runtime_minutes, remaining=remaining_repos)
             )
             current_repo = os.environ.get("GITHUB_REPOSITORY")
             current_ref = os.environ.get("GITHUB_REF_NAME", "main")
@@ -276,12 +308,12 @@ def main() -> int:
                     json_data={"ref": current_ref},
                 )
                 if relay_resp.status_code in (200, 204):
-                    logger.info("✅ 自动接力工作流触发成功！下一轮任务将立即启动并无缝继续同步。")
+                    logger.info(t("log_relay_success", lang=current_lang))
                     warnings_list.append(
-                        f"⏳ **自动接力已触发**：单次运行已达 {int(elapsed_min)} 分钟安全上限，已自动启动下一轮任务继续同步剩余 {remaining_repos} 个仓库"
+                        t("auto_relay_triggered", lang=current_lang, minutes=int(elapsed_min), remaining=remaining_repos)
                     )
                 else:
-                    logger.error(f"❌ 触发自动接力工作流失败 ({relay_resp.status_code}): {relay_resp.text}")
+                    logger.error(t("log_relay_failed", lang=current_lang, status=relay_resp.status_code, detail=relay_resp.text))
             break
 
         repo_full_name = repo_data.get("full_name", "")
@@ -289,9 +321,9 @@ def main() -> int:
 
         logger.info(f"\n" + "-" * 60)
         if debug_mode:
-            logger.info(f"🔄 [进度: {idx}/{total_repos_count} ({progress_pct}%)] 正在处理仓库: {repo_full_name}")
+            logger.info(t("log_processing_repo_debug", lang=current_lang, idx=idx, total=total_repos_count, percent=progress_pct, repo=repo_full_name))
         else:
-            logger.info(f"🔄 [进度: {progress_pct}%] 正在处理仓库...")
+            logger.info(t("log_processing_repo_std", lang=current_lang, percent=progress_pct))
         logger.info("-" * 60)
 
         if log_filter and repo_data.get("parent"):
@@ -304,7 +336,7 @@ def main() -> int:
             if ok:
                 stats["actions_disabled_repos"] += 1
             else:
-                warnings_list.append(f"`{repo_full_name}`: Actions 禁用未成功 ({msg})")
+                warnings_list.append(f"`{repo_full_name}`: {t('actions_disabled_failed', lang=current_lang, msg=msg)}")
 
         # 2. Sync all branches
         try:
@@ -339,21 +371,30 @@ def main() -> int:
 
         if debug_mode:
             logger.info(
-                f"✅ [进度: {idx}/{total_repos_count}] {repo_full_name} 处理完毕 | "
-                f"累计: 同步成功 {stats['synced_branches']}, 新建 {stats['created_branches']}, "
-                f"最新 {stats['uptodate_branches']}, 跳过 {stats['skipped_branches']}, 失败 {stats['failed']}"
+                t(
+                    "log_repo_done_debug",
+                    lang=current_lang,
+                    idx=idx,
+                    total=total_repos_count,
+                    repo=repo_full_name,
+                    synced=stats["synced_branches"],
+                    created=stats["created_branches"],
+                    uptodate=stats["uptodate_branches"],
+                    skipped=stats["skipped_branches"],
+                    failed=stats["failed"],
+                )
             )
         else:
-            logger.info(f"✅ [进度: {progress_pct}%] 当前仓库处理完毕")
+            logger.info(t("log_repo_done_std", lang=current_lang, percent=progress_pct))
 
     end_time = datetime.now(timezone.utc)
 
     if getattr(client, "token_expiration", None):
-        warnings_list.append(f"🔑 Token 有效期: 预计于 `{client.token_expiration}` 到期")
+        warnings_list.append(t("log_token_expiry", lang=current_lang, expiry=client.token_expiration))
 
     # Output GitHub Step Summary
     debug_mode = config.get("debug_mode", False)
-    summary_md = generate_step_summary(results, stats, start_time, end_time, debug_mode=debug_mode)
+    summary_md = generate_step_summary(results, stats, start_time, end_time, debug_mode=debug_mode, lang=current_lang)
     print("\n" + "=" * 50)
     print(summary_md)
     print("=" * 50 + "\n")
@@ -368,21 +409,31 @@ def main() -> int:
             logger.warning(f"Could not write to GITHUB_STEP_SUMMARY: {exc}")
 
     # Send Feishu Notification
-    feishu_webhook = config.get("feishu_webhook_url")
-    feishu_secret = config.get("feishu_secret")
     if feishu_webhook:
         logger.info("Sending Feishu notification card...")
         send_feishu_card(
             webhook_url=feishu_webhook,
             secret=feishu_secret,
-            title="🔄 GitHub Fork 仓库同步完成",
+            title=t("feishu_default_title", lang=current_lang),
             stats=stats,
             warnings=warnings_list,
             errors=errors_list,
             execution_time_str=start_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            lang=current_lang,
         )
 
-    logger.info("Forks synchronization and management job finished.")
+    # Send Email Notification
+    send_email_notification(
+        smtp_config=config,
+        title=t("summary_title", lang=current_lang),
+        stats=stats,
+        warnings=warnings_list,
+        errors=errors_list,
+        execution_time_str=start_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        lang=current_lang,
+    )
+
+    logger.info(t("log_job_finished", lang=current_lang))
     return 0
 
 

@@ -20,6 +20,13 @@ on:
     types: [started]
   workflow_dispatch:
     inputs:
+      language:
+        description: 'Language / 界面与报告语言 (zh or en)'
+        type: choice
+        options:
+          - zh
+          - en
+        default: zh
       include_only:
         description: 'Only sync specified repos (e.g. repo1,owner/repo2). Leave empty to sync all.'
         type: string
@@ -74,6 +81,13 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST || vars.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || vars.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER || vars.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS || secrets.SMTP_PASSWORD }}
+          SMTP_TO: ${{ secrets.SMTP_TO || vars.SMTP_TO }}
+          SMTP_FROM_NAME: ${{ secrets.SMTP_FROM_NAME || vars.SMTP_FROM_NAME }}
+          LANGUAGE: ${{ inputs.language != '' && inputs.language || vars.LANGUAGE || secrets.LANGUAGE || 'zh' }}
           EXCLUDE_REPOS: ${{ inputs.exclude_repos != '' && inputs.exclude_repos || vars.EXCLUDE_REPOS || secrets.EXCLUDE_REPOS }}
           INCLUDE_ONLY: ${{ inputs.include_only != '' && inputs.include_only || vars.INCLUDE_ONLY || secrets.INCLUDE_ONLY }}
           DEBUG_MODE: ${{ inputs.debug_mode != '' && inputs.debug_mode || secrets.DEBUG_MODE || vars.DEBUG_MODE || 'false' }}
