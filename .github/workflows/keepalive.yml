@@ -1,0 +1,38 @@
+name: Keep Alive Heartbeat
+
+on:
+  schedule:
+    # Runs on the 1st and 15th of every month at 04:15 UTC (every ~15-30 days to prevent 60-day inactivity pause)
+    - cron: '15 4 1,15 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keepalive-lock
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Update Heartbeat Timestamp
+        run: |
+          echo "# Heartbeat record to keep GitHub Actions cron schedules active" > .github/keepalive.txt
+          echo "Last heartbeat: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> .github/keepalive.txt
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/keepalive.txt
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: automated keep-alive heartbeat [skip ci]"
+            git push origin main
+          fi
