@@ -58,6 +58,31 @@ def chunk_list(items: List[Any], chunk_size: int) -> List[List[Any]]:
     return [items[i : i + chunk_size] for i in range(0, len(items), chunk_size)]
 
 
+def format_stats_markdown(stats: Dict[str, int], execution_time_str: str) -> str:
+    """
+    Format the main statistics section with clear hierarchical layout.
+    Modify this function if you want to change the order, icons, or wording of the summary card.
+    """
+    lines = [
+        f"**⏰ 执行时间**: {execution_time_str}",
+        "",
+        "**📦 仓库处理概览**",
+        f"• 扫描 Fork 仓库总数: **{stats.get('total_repos', 0)}** 个",
+        f"• Actions 已禁用仓库: **{stats.get('actions_disabled_repos', 0)}** 个",
+        "",
+        "**🌿 分支变动明细**",
+        f"• ⚡ 安全快进同步: **{stats.get('synced_branches', 0)}** 个分支",
+        f"• 🌱 上游新建分支: **{stats.get('created_branches', 0)}** 个分支",
+        f"• ✅ 保持最新状态: **{stats.get('uptodate_branches', 0)}** 个分支",
+        f"• 🛡️ 安全跳过保护: **{stats.get('skipped_branches', 0)}** 个分支",
+    ]
+
+    if stats.get("failed", 0) > 0:
+        lines.append(f"• ❌ 同步异常失败: **{stats.get('failed', 0)}** 个")
+
+    return "\n".join(lines)
+
+
 def send_feishu_card(
     webhook_url: str,
     secret: Optional[str],
@@ -78,18 +103,8 @@ def send_feishu_card(
 
     header_color = "red" if (len(errors) > 0 or stats.get("failed", 0) > 0) else ("orange" if len(warnings) > 0 else "blue")
 
-    # Build markdown content for statistics
-    stats_md = (
-        f"**⏰ 执行时间**: {execution_time_str}\n"
-        f"**📦 扫描 Fork 仓库**: {stats.get('total_repos', 0)} 个\n"
-        f"**⚡ 分支同步成功 (Fast-Forward)**: {stats.get('synced_branches', 0)} 个\n"
-        f"**🌱 上游新增分支创建**: {stats.get('created_branches', 0)} 个\n"
-        f"**✅ 已是最新分支**: {stats.get('uptodate_branches', 0)} 个\n"
-        f"**🛡️ 安全跳过 (分叉/硬回退保护)**: {stats.get('skipped_branches', 0)} 个\n"
-        f"**🚫 Actions 已禁用仓库**: {stats.get('actions_disabled_repos', 0)} 个"
-    )
-    if stats.get("failed", 0) > 0:
-        stats_md += f"\n**❌ 失败/异常**: {stats.get('failed', 0)} 个"
+    # Build structured markdown content for statistics
+    stats_md = format_stats_markdown(stats, execution_time_str)
 
     # Chunk warnings and errors
     warn_chunks = chunk_list(warnings, batch_size) if warnings else []
