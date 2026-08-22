@@ -20,6 +20,27 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 
+class PrivacyLogFilter(logging.Filter):
+    """Filter that masks sensitive repository and user names from stdout logs in non-debug mode."""
+
+    def __init__(self):
+        super().__init__()
+        self.masked_terms: Set[str] = set()
+
+    def add_term(self, term: str):
+        if term and len(term) >= 2:
+            self.masked_terms.add(term)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if self.masked_terms and isinstance(record.msg, str):
+            msg = record.msg
+            for term in sorted(self.masked_terms, key=len, reverse=True):
+                if term in msg:
+                    msg = msg.replace(term, "***")
+            record.msg = msg
+        return True
+
+
 def load_config() -> Dict[str, Any]:
     """Load configuration from config.json if present, then override with environment variables."""
     config: Dict[str, Any] = {
@@ -124,6 +145,13 @@ def generate_step_summary(
 def main() -> int:
     start_time = datetime.now(timezone.utc)
     config = load_config()
+    debug_mode = config.get("debug_mode", False)
+
+    privacy_filter = None
+    if not debug_mode:
+        privacy_filter = PrivacyLogFilter()
+        for handler in logging.root.handlers:
+            handler.addFilter(privacy_filter)
 
     token = config.get("gh_pat", "")
     if not token:
@@ -135,6 +163,8 @@ def main() -> int:
     try:
         user_info = client.get_authenticated_user()
         username = user_info.get("login", "Unknown")
+        if privacy_filter:
+            privacy_filter.add_term(username)
         logger.info(f"Authenticated as GitHub user: @{username}")
     except Exception as exc:
         logger.error(f"GitHub authentication error: {exc}")
@@ -142,6 +172,14 @@ def main() -> int:
 
     logger.info("Fetching all repositories owned by user...")
     repos = client.get_paginated("/user/repos", params={"type": "owner", "sort": "full_name"})
+    
+    if privacy_filter:
+        for r in repos:
+            if r.get("name"):
+                privacy_filter.add_term(r.get("name"))
+            if r.get("full_name"):
+                privacy_filter.add_term(r.get("full_name"))
+
     fork_repos = [r for r in repos if r.get("fork") is True]
 
     logger.info(f"Found {len(repos)} total owned repos, {len(fork_repos)} are forked repositories.")
@@ -180,6 +218,10 @@ def main() -> int:
     for idx, repo_data in enumerate(filtered_forks, start=1):
         repo_full_name = repo_data.get("full_name", "")
         logger.info(f"\n[{idx}/{len(filtered_forks)}] Processing repository: {repo_full_name}")
+
+        if privacy_filter and repo_data.get("parent"):
+            privacy_filter.add_term(repo_data["parent"].get("full_name", ""))
+            privacy_filter.add_term(repo_data["parent"].get("name", ""))
 
         # 1. Disable GitHub Actions if enabled in config
         if config.get("disable_actions", True):

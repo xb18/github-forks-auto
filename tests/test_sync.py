@@ -13,7 +13,8 @@ from src.syncer import (
     sync_single_branch,
     sync_repository_branches,
 )
-from src.main import generate_step_summary
+from src.main import generate_step_summary, PrivacyLogFilter
+import logging
 
 
 class TestSyncLogic(unittest.TestCase):
@@ -188,6 +189,25 @@ class TestSyncLogic(unittest.TestCase):
         summary_debug = generate_step_summary(results, stats, start, end, debug_mode=True)
         self.assertIn("Debug Mode", summary_debug)
         self.assertIn("user/secret-repo", summary_debug)
+
+    def test_privacy_log_filter(self):
+        """Test PrivacyLogFilter masking sensitive names from log records."""
+        filter_inst = PrivacyLogFilter()
+        filter_inst.add_term("my-secret-repo")
+        filter_inst.add_term("alice_user")
+
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=10,
+            msg="User alice_user is processing my-secret-repo now",
+            args=(),
+            exc_info=None,
+        )
+
+        filter_inst.filter(record)
+        self.assertEqual(record.msg, "User *** is processing *** now")
 
 
 if __name__ == "__main__":
