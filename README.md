@@ -67,7 +67,7 @@
 
 ### 步骤 4：运行与定时调度
 
-- **定时自动运行**：默认已在 `.github/workflows/sync_forks.yml` 中配置每 6 小时自动运行一次（`0 */6 * * *`）。
+- **定时自动运行**：默认已在 `.github/workflows/sync_forks.yml` 中配置每周日 00:00 UTC（北京时间每周日早 8 点）自动运行一次（`0 0 * * 0`）。
 - **手动立即运行**：
   1. 进入仓库的 **Actions** 页面。
   2. 点击左侧的 **Auto Sync Forks & Disable Actions** 工作流。

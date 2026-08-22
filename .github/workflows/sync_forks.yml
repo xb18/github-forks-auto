@@ -2,8 +2,8 @@ name: Auto Sync Forks & Disable Actions
 
 on:
   schedule:
-    # Runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
-    - cron: '0 */6 * * *'
+    # Runs once a week on Sunday at 00:00 UTC (08:00 AM Beijing Time)
+    - cron: '0 0 * * 0'
   workflow_dispatch:
     inputs:
       disable_actions:
