@@ -159,8 +159,7 @@ def sync_single_branch(
     # If status is diverged -> Upstream history rewritten or user has custom commits
     elif compare_status == "diverged":
         warn_msg = (
-            f"Diverged (Fork ahead by {behind_by}, behind by {ahead_by}). "
-            f"Upstream may have force-pushed or fork has local commits. Skipped to prevent data loss."
+            f"Diverged 分叉保护 (Fork 领先 {behind_by}，落后 {ahead_by})：上游可能存在硬回退(Force Push)或本地有独立提交，已跳过防丢失代码"
         )
         logger.warning(f"[{fork_full_name}:{branch_name}] 🛡️ {warn_msg}")
         return BranchResult(
@@ -173,7 +172,7 @@ def sync_single_branch(
 
     # If fork is ahead of upstream
     elif compare_status == "behind":
-        msg = f"Fork is ahead of upstream by {behind_by} commits. Keeping local commits."
+        msg = f"Fork 本地领先上游 {behind_by} 个提交 (保留本地独有代码)，已跳过同步"
         logger.info(f"[{fork_full_name}:{branch_name}] {msg}")
         return BranchResult(
             branch_name=branch_name,
