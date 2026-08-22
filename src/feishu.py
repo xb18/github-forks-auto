@@ -22,6 +22,42 @@ def generate_feishu_sign(secret: str, timestamp: int) -> str:
     return sign
 
 
+def send_single_feishu_payload(
+    webhook_url: str,
+    secret: Optional[str],
+    card_dict: Dict[str, Any],
+) -> bool:
+    """Send a single interactive card payload to Feishu webhook."""
+    timestamp = int(time.time())
+    headers = {"Content-Type": "application/json"}
+
+    card_payload: Dict[str, Any] = {
+        "msg_type": "interactive",
+        "card": card_dict,
+    }
+
+    if secret:
+        card_payload["timestamp"] = str(timestamp)
+        card_payload["sign"] = generate_feishu_sign(secret, timestamp)
+
+    try:
+        resp = requests.post(webhook_url, json=card_payload, headers=headers, timeout=15)
+        resp_data = resp.json() if resp.status_code == 200 else {}
+        if resp.status_code == 200 and resp_data.get("code") == 0:
+            return True
+        else:
+            logger.error(f"Failed to send Feishu card: {resp.status_code} {resp.text}")
+            return False
+    except Exception as exc:
+        logger.error(f"Exception sending Feishu card: {exc}")
+        return False
+
+
+def chunk_list(items: List[Any], chunk_size: int) -> List[List[Any]]:
+    """Split a list into smaller chunks."""
+    return [items[i : i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+
 def send_feishu_card(
     webhook_url: str,
     secret: Optional[str],
@@ -30,18 +66,16 @@ def send_feishu_card(
     warnings: List[str],
     errors: List[str],
     execution_time_str: str,
+    batch_size: int = 15,
 ) -> bool:
     """
     Send an interactive card notification to Feishu custom bot webhook.
+    Automatically splits long reports across multiple cards if necessary.
     """
     if not webhook_url:
         logger.info("Feishu webhook URL not configured, skipping notification.")
         return False
 
-    timestamp = int(time.time())
-    headers = {"Content-Type": "application/json"}
-
-    has_issues = len(warnings) > 0 or len(errors) > 0 or stats.get("failed", 0) > 0
     header_color = "red" if (len(errors) > 0 or stats.get("failed", 0) > 0) else ("orange" if len(warnings) > 0 else "blue")
 
     # Build markdown content for statistics
@@ -57,7 +91,21 @@ def send_feishu_card(
     if stats.get("failed", 0) > 0:
         stats_md += f"\n**❌ 失败/异常**: {stats.get('failed', 0)} 个"
 
-    elements: List[Dict[str, Any]] = [
+    # Chunk warnings and errors
+    warn_chunks = chunk_list(warnings, batch_size) if warnings else []
+    err_chunks = chunk_list(errors, batch_size) if errors else []
+
+    # Calculate total cards needed
+    total_parts = 1 + max(0, len(warn_chunks) - 1) + max(0, len(err_chunks) - 1)
+    if len(warn_chunks) > 1 and len(err_chunks) > 1:
+        total_parts = 1 + (len(warn_chunks) - 1) + (len(err_chunks) - 1)
+    elif len(warn_chunks) > 1:
+        total_parts = len(warn_chunks)
+    elif len(err_chunks) > 1:
+        total_parts = len(err_chunks)
+
+    # 1. First Card (Overview + First batch of warnings/errors)
+    first_elements: List[Dict[str, Any]] = [
         {
             "tag": "div",
             "text": {
@@ -67,69 +115,63 @@ def send_feishu_card(
         }
     ]
 
-    # Add warnings section if any
-    if warnings:
-        warn_content = "**🛡️ 安全拦截与提醒事项 (避免代码丢失)**:\n" + "\n".join(f"- {w}" for w in warnings[:15])
-        if len(warnings) > 15:
-            warn_content += f"\n- ... 另有 {len(warnings) - 15} 条跳过记录，详见 GitHub Actions 日志"
-        elements.extend([
+    if warn_chunks:
+        warn_text = "**🛡️ 安全拦截与提醒事项 (避免代码丢失)**:\n" + "\n".join(f"- {w}" for w in warn_chunks[0])
+        first_elements.extend([
             {"tag": "hr"},
-            {
-                "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": warn_content,
-                },
-            },
+            {"tag": "div", "text": {"tag": "lark_md", "content": warn_text}},
         ])
 
-    # Add errors section if any
-    if errors:
-        err_content = "**❌ 异常失败记录**:\n" + "\n".join(f"- {e}" for e in errors[:10])
-        elements.extend([
+    if err_chunks:
+        err_text = "**❌ 异常失败记录**:\n" + "\n".join(f"- {e}" for e in err_chunks[0])
+        first_elements.extend([
             {"tag": "hr"},
-            {
-                "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": err_content,
-                },
-            },
+            {"tag": "div", "text": {"tag": "lark_md", "content": err_text}},
         ])
 
-    card_payload: Dict[str, Any] = {
-        "msg_type": "interactive",
-        "card": {
-            "config": {
-                "wide_screen_mode": True,
-            },
-            "header": {
-                "title": {
-                    "tag": "plain_text",
-                    "content": title,
-                },
-                "template": header_color,
-            },
-            "elements": elements,
-        },
+    first_title = f"{title} (1/{total_parts})" if total_parts > 1 else title
+    first_card = {
+        "config": {"wide_screen_mode": True},
+        "header": {"title": {"tag": "plain_text", "content": first_title}, "template": header_color},
+        "elements": first_elements,
     }
 
-    if secret:
-        card_payload["timestamp"] = str(timestamp)
-        card_payload["sign"] = generate_feishu_sign(secret, timestamp)
+    all_success = send_single_feishu_payload(webhook_url, secret, first_card)
 
-    try:
-        resp = requests.post(webhook_url, json=card_payload, headers=headers, timeout=15)
-        resp_data = resp.json() if resp.status_code == 200 else {}
-        if resp.status_code == 200 and resp_data.get("code") == 0:
-            logger.info("Feishu notification sent successfully.")
-            return True
-        else:
-            logger.error(f"Failed to send Feishu notification: {resp.status_code} {resp.text}")
-            return False
-    except Exception as exc:
-        logger.error(f"Exception sending Feishu notification: {exc}")
-        return False
+    # 2. Subsequent Cards for remaining warnings
+    current_part = 2
+    for w_chunk in warn_chunks[1:]:
+        time.sleep(0.5)
+        w_text = f"**🛡️ 提醒事项续前页 (第 {current_part} 部分)**:\n" + "\n".join(f"- {w}" for w in w_chunk)
+        sub_card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": f"{title} (续 {current_part}/{total_parts})"},
+                "template": header_color,
+            },
+            "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": w_text}}],
+        }
+        ok = send_single_feishu_payload(webhook_url, secret, sub_card)
+        all_success = all_success and ok
+        current_part += 1
+
+    # 3. Subsequent Cards for remaining errors
+    for e_chunk in err_chunks[1:]:
+        time.sleep(0.5)
+        e_text = f"**❌ 异常失败记录续前页 (第 {current_part} 部分)**:\n" + "\n".join(f"- {e}" for e in e_chunk)
+        sub_card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": f"{title} (续 {current_part}/{total_parts})"},
+                "template": "red",
+            },
+            "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": e_text}}],
+        }
+        ok = send_single_feishu_payload(webhook_url, secret, sub_card)
+        all_success = all_success and ok
+        current_part += 1
+
+    return all_success
 
 
 def send_feishu_alert(

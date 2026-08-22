@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 
 from src.client import GitHubClient
-from src.feishu import generate_feishu_sign, send_feishu_alert
+from src.feishu import generate_feishu_sign, send_feishu_alert, send_feishu_card
 from src.action_disabler import disable_repo_actions
 from src.syncer import (
     BranchSyncStatus,
@@ -242,6 +242,32 @@ class TestSyncLogic(unittest.TestCase):
         val = "repo1, owner/repo2; repo3\nrepo4\r\nrepo5 repo6"
         res = parse_repo_list(val)
         self.assertEqual(res, ["repo1", "owner/repo2", "repo3", "repo4", "repo5", "repo6"])
+
+    @patch("requests.post")
+    def test_send_feishu_card_pagination(self, mock_post):
+        """Test splitting large warnings list across multiple Feishu cards."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"code": 0}
+        mock_post.return_value = mock_resp
+
+        # Create 25 warning messages with batch_size=10 -> should send 3 cards (10 + 10 + 5)
+        warnings = [f"Warning item #{i}" for i in range(1, 26)]
+        stats = {"total_repos": 25, "synced_branches": 0, "created_branches": 0, "uptodate_branches": 0, "skipped_branches": 25}
+
+        ok = send_feishu_card(
+            webhook_url="https://open.feishu.cn/open-apis/bot/v2/hook/xxx",
+            secret=None,
+            title="🔄 GitHub Fork 同步完成",
+            stats=stats,
+            warnings=warnings,
+            errors=[],
+            execution_time_str="2026-08-22 10:00:00 UTC",
+            batch_size=10,
+        )
+
+        self.assertTrue(ok)
+        self.assertEqual(mock_post.call_count, 3)
 
 
 if __name__ == "__main__":
