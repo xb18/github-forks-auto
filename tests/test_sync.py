@@ -288,6 +288,35 @@ class TestSyncLogic(unittest.TestCase):
         self.assertIn("新建: 2", res)
         self.assertNotIn("扫描 Fork 仓库总数", res)  # User removed this field from their custom template
 
+    def test_repo_only_placeholders(self):
+        """Test {issue_repos} and {issue_repos_inline} without branch names."""
+        custom_tpl = "**精简提醒**\n需关注仓库:\n{issue_repos}\n行内列表: {issue_repos_inline}"
+        stats = {
+            "total_repos": 10,
+            "synced_branches": 3,
+            "created_branches": 2,
+            "uptodate_branches": 3,
+            "skipped_branches": 2,
+            "actions_disabled_repos": 10,
+            "failed": 1,
+        }
+        warnings = [
+            "`user/repo1` [main]: Diverged (分叉保护)",
+            "`user/repo1` [dev]: Fork 领先 2 提交",
+            "`user/repo2` [feature]: Diverged",
+        ]
+        errors = [
+            "`user/repo3` [master]: 403 Forbidden",
+        ]
+        res = format_stats_markdown(stats, "2026-08-22 10:00:00 UTC", template_str=custom_tpl, warnings=warnings, errors=errors)
+        self.assertIn("- `user/repo1`", res)
+        self.assertIn("- `user/repo2`", res)
+        self.assertIn("- `user/repo3`", res)
+        self.assertIn("行内列表: `user/repo1`, `user/repo2`, `user/repo3`", res)
+        self.assertNotIn("[main]", res)
+        self.assertNotIn("[dev]", res)
+        self.assertNotIn("Diverged", res)
+
 
 if __name__ == "__main__":
     unittest.main()

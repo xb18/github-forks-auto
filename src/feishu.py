@@ -4,6 +4,8 @@ import base64
 import hashlib
 import hmac
 import logging
+import os
+import re
 import time
 from typing import Any, Dict, List, Optional
 import requests
@@ -60,6 +62,22 @@ def chunk_list(items: List[Any], chunk_size: int) -> List[List[Any]]:
 
 import os
 
+def extract_repo_names(items: List[str]) -> List[str]:
+    """Extract and deduplicate repository names from warning/error logs."""
+    repos: List[str] = []
+    for item in items:
+        m = re.search(r'`([^`]+)`', item)
+        if m:
+            name = m.group(1)
+            if name not in repos:
+                repos.append(name)
+        else:
+            first_part = item.split()[0].rstrip(":")
+            if first_part and first_part not in repos:
+                repos.append(first_part)
+    return repos
+
+
 def format_stats_markdown(
     stats: Dict[str, int],
     execution_time_str: str,
@@ -74,7 +92,10 @@ def format_stats_markdown(
       {execution_time}, {total_repos}, {actions_disabled_repos},
       {synced_branches}, {created_branches}, {uptodate_branches},
       {skipped_branches}, {failed}, {status_emoji}, {status_text},
-      {issues}, {warnings}, {errors}
+      {issues}, {warnings}, {errors},
+      {issue_repos}, {issue_repos_inline},
+      {warning_repos}, {warning_repos_inline},
+      {error_repos}, {error_repos_inline}
     """
     warnings = warnings or []
     errors = errors or []
@@ -92,7 +113,7 @@ def format_stats_markdown(
     status_text = "发生异常" if failed_count > 0 else ("有跳过提醒" if skipped_count > 0 else "全部正常")
     status_emoji = "🔴" if failed_count > 0 else ("🟡" if skipped_count > 0 else "🟢")
 
-    # Build issue strings
+    # Build issue strings (full detail with branch and reason)
     warn_text = "\n".join(f"- {w}" for w in warnings) if warnings else "无"
     err_text = "\n".join(f"- {e}" for e in errors) if errors else "无"
 
@@ -102,6 +123,18 @@ def format_stats_markdown(
     if errors:
         issues_list.append("**❌ 异常失败记录**:\n" + err_text)
     issues_text = "\n\n".join(issues_list) if issues_list else "✅ 所有分支均保持最新或同步成功，无异常与跳过记录。"
+
+    # Build repo-only strings (pure repository names without branch or verbose messages)
+    warn_repos = extract_repo_names(warnings)
+    err_repos = extract_repo_names(errors)
+    all_issue_repos = list(dict.fromkeys(warn_repos + err_repos))
+
+    issue_repos_text = "\n".join(f"- `{r}`" for r in all_issue_repos) if all_issue_repos else "无"
+    issue_repos_inline_text = ", ".join(f"`{r}`" for r in all_issue_repos) if all_issue_repos else "无"
+    warning_repos_text = "\n".join(f"- `{r}`" for r in warn_repos) if warn_repos else "无"
+    warning_repos_inline_text = ", ".join(f"`{r}`" for r in warn_repos) if warn_repos else "无"
+    error_repos_text = "\n".join(f"- `{r}`" for r in err_repos) if err_repos else "无"
+    error_repos_inline_text = ", ".join(f"`{r}`" for r in err_repos) if err_repos else "无"
 
     if raw_template:
         replacements = {
@@ -118,6 +151,12 @@ def format_stats_markdown(
             "issues": issues_text,
             "warnings": warn_text,
             "errors": err_text,
+            "issue_repos": issue_repos_text,
+            "issue_repos_inline": issue_repos_inline_text,
+            "warning_repos": warning_repos_text,
+            "warning_repos_inline": warning_repos_inline_text,
+            "error_repos": error_repos_text,
+            "error_repos_inline": error_repos_inline_text,
         }
         res = raw_template
         for key, val in replacements.items():
