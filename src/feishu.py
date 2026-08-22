@@ -261,8 +261,14 @@ def send_feishu_card(
         }
     ]
 
-    if not template_has_issues:
-        # Default concise mode: Only send 1 clean card
+    template_has_warnings = bool(raw_template and ("{warnings}" in raw_template or "{issues}" in raw_template))
+    template_has_errors = bool(raw_template and ("{errors}" in raw_template or "{issues}" in raw_template))
+
+    active_warn_chunks = warn_chunks if template_has_warnings else []
+    active_err_chunks = err_chunks if template_has_errors else []
+
+    if not template_has_warnings and not template_has_errors:
+        # Concise mode: Only send 1 clean card
         first_card = {
             "config": {"wide_screen_mode": True},
             "header": {"title": {"tag": "plain_text", "content": title}, "template": header_color},
@@ -270,14 +276,14 @@ def send_feishu_card(
         }
         return send_single_feishu_payload(webhook_url, secret, first_card)
 
-    # Verbose mode: Calculate total cards needed for verbose issues
-    total_parts = 1 + max(0, len(warn_chunks) - 1) + max(0, len(err_chunks) - 1)
-    if len(warn_chunks) > 1 and len(err_chunks) > 1:
-        total_parts = 1 + (len(warn_chunks) - 1) + (len(err_chunks) - 1)
-    elif len(warn_chunks) > 1:
-        total_parts = len(warn_chunks)
-    elif len(err_chunks) > 1:
-        total_parts = len(err_chunks)
+    # Verbose mode: Calculate total cards needed for active placeholders
+    total_parts = 1 + max(0, len(active_warn_chunks) - 1) + max(0, len(active_err_chunks) - 1)
+    if len(active_warn_chunks) > 1 and len(active_err_chunks) > 1:
+        total_parts = 1 + (len(active_warn_chunks) - 1) + (len(active_err_chunks) - 1)
+    elif len(active_warn_chunks) > 1:
+        total_parts = len(active_warn_chunks)
+    elif len(active_err_chunks) > 1:
+        total_parts = len(active_err_chunks)
 
     first_title = f"{title} (1/{total_parts})" if total_parts > 1 else title
     first_card = {
@@ -288,38 +294,40 @@ def send_feishu_card(
 
     all_success = send_single_feishu_payload(webhook_url, secret, first_card)
 
-    # 2. Subsequent Cards for remaining warnings
+    # 2. Subsequent Cards for remaining warnings (only if {warnings} or {issues} in template)
     current_part = 2
-    for w_chunk in warn_chunks[1:]:
-        time.sleep(0.5)
-        w_text = f"{t('feishu_warn_part_title', lang=current_lang, current=current_part)}\n" + "\n".join(f"- {w}" for w in w_chunk)
-        sub_card = {
-            "config": {"wide_screen_mode": True},
-            "header": {
-                "title": {"tag": "plain_text", "content": f"{title} ({current_part}/{total_parts})"},
-                "template": header_color,
-            },
-            "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": w_text}}],
-        }
-        ok = send_single_feishu_payload(webhook_url, secret, sub_card)
-        all_success = all_success and ok
-        current_part += 1
+    if template_has_warnings:
+        for w_chunk in active_warn_chunks[1:]:
+            time.sleep(0.5)
+            w_text = f"{t('feishu_warn_part_title', lang=current_lang, current=current_part)}\n" + "\n".join(f"- {w}" for w in w_chunk)
+            sub_card = {
+                "config": {"wide_screen_mode": True},
+                "header": {
+                    "title": {"tag": "plain_text", "content": f"{title} ({current_part}/{total_parts})"},
+                    "template": header_color,
+                },
+                "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": w_text}}],
+            }
+            ok = send_single_feishu_payload(webhook_url, secret, sub_card)
+            all_success = all_success and ok
+            current_part += 1
 
-    # 3. Subsequent Cards for remaining errors
-    for e_chunk in err_chunks[1:]:
-        time.sleep(0.5)
-        e_text = f"{t('feishu_err_part_title', lang=current_lang, current=current_part)}\n" + "\n".join(f"- {e}" for e in e_chunk)
-        sub_card = {
-            "config": {"wide_screen_mode": True},
-            "header": {
-                "title": {"tag": "plain_text", "content": f"{title} ({current_part}/{total_parts})"},
-                "template": "red",
-            },
-            "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": e_text}}],
-        }
-        ok = send_single_feishu_payload(webhook_url, secret, sub_card)
-        all_success = all_success and ok
-        current_part += 1
+    # 3. Subsequent Cards for remaining errors (only if {errors} or {issues} in template)
+    if template_has_errors:
+        for e_chunk in active_err_chunks[1:]:
+            time.sleep(0.5)
+            e_text = f"{t('feishu_err_part_title', lang=current_lang, current=current_part)}\n" + "\n".join(f"- {e}" for e in e_chunk)
+            sub_card = {
+                "config": {"wide_screen_mode": True},
+                "header": {
+                    "title": {"tag": "plain_text", "content": f"{title} ({current_part}/{total_parts})"},
+                    "template": "red",
+                },
+                "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": e_text}}],
+            }
+            ok = send_single_feishu_payload(webhook_url, secret, sub_card)
+            all_success = all_success and ok
+            current_part += 1
 
     return all_success
 
