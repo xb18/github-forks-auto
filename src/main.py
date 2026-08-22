@@ -20,8 +20,8 @@ logging.basicConfig(
 logger = logging.getLogger("main")
 
 
-class PrivacyLogFilter(logging.Filter):
-    """Filter that masks sensitive repository and user names from stdout logs in non-debug mode."""
+class StandardLogFilter(logging.Filter):
+    """Filter that sanitizes verbose names in standard non-debug logging mode."""
 
     def __init__(self):
         super().__init__()
@@ -120,7 +120,7 @@ def generate_step_summary(
     ]
 
     if not debug_mode:
-        lines.append("> 🔒 **隐私保护模式已生效**：当前为非 Debug 模式，已隐藏所有具体仓库名称与分支明细，确保公有仓库运行安全。完整变更明细已私密推送至飞书。如需在 GitHub 页面公开显示详细表格，可设置 Secret `DEBUG_MODE=true`。")
+        lines.append("> ℹ️ **当前为标准日志模式**：仅展示统计总览。如需在 GitHub 页面公开显示每个仓库的详细处理明细表格，请开启 Secret `DEBUG_MODE=true`。详细明细已同步推送至飞书。")
         lines.append("")
         return "\n".join(lines)
 
@@ -162,11 +162,11 @@ def main() -> int:
     config = load_config()
     debug_mode = config.get("debug_mode", False)
 
-    privacy_filter = None
+    log_filter = None
     if not debug_mode:
-        privacy_filter = PrivacyLogFilter()
+        log_filter = StandardLogFilter()
         for handler in logging.root.handlers:
-            handler.addFilter(privacy_filter)
+            handler.addFilter(log_filter)
 
     feishu_webhook = config.get("feishu_webhook_url")
     feishu_secret = config.get("feishu_secret")
@@ -189,8 +189,8 @@ def main() -> int:
     try:
         user_info = client.get_authenticated_user()
         username = user_info.get("login", "Unknown")
-        if privacy_filter:
-            privacy_filter.add_term(username)
+        if log_filter:
+            log_filter.add_term(username)
         logger.info(f"Authenticated as GitHub user: @{username}")
     except Exception as exc:
         err_msg = f"❌ **GitHub 身份鉴权失败**: {str(exc)}\n\n⚠️ **原因**: 您的 Personal Access Token (`GH_PAT`) 可能已**过期或被撤销**，导致无法访问 GitHub API。\n\n👉 请尽快重新生成 Token 并更新仓库 Secret。"
@@ -207,12 +207,12 @@ def main() -> int:
     logger.info("Fetching all repositories owned by user...")
     repos = client.get_paginated("/user/repos", params={"type": "owner", "sort": "full_name"})
     
-    if privacy_filter:
+    if log_filter:
         for r in repos:
             if r.get("name"):
-                privacy_filter.add_term(r.get("name"))
+                log_filter.add_term(r.get("name"))
             if r.get("full_name"):
-                privacy_filter.add_term(r.get("full_name"))
+                log_filter.add_term(r.get("full_name"))
 
     fork_repos = [r for r in repos if r.get("fork") is True]
 
@@ -268,9 +268,9 @@ def main() -> int:
             logger.info(f"🔄 [进度: {progress_pct}%] 正在处理仓库...")
         logger.info("-" * 60)
 
-        if privacy_filter and repo_data.get("parent"):
-            privacy_filter.add_term(repo_data["parent"].get("full_name", ""))
-            privacy_filter.add_term(repo_data["parent"].get("name", ""))
+        if log_filter and repo_data.get("parent"):
+            log_filter.add_term(repo_data["parent"].get("full_name", ""))
+            log_filter.add_term(repo_data["parent"].get("name", ""))
 
         # 1. Disable GitHub Actions if enabled in config
         if config.get("disable_actions", True):

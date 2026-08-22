@@ -48,7 +48,7 @@
 | `GH_PAT` | **必填** | 步骤 1 生成的 GitHub PAT（Classic 勾选 repo） |
 | `FEISHU_WEBHOOK_URL` | 选填 | 飞书自定义机器人的 Webhook 地址 |
 | `FEISHU_SECRET` | 选填 | 飞书机器人的安全设置签名校验密钥（若开启） |
-| `DEBUG_MODE` | 选填 | 默认为 `false`（隐私保护模式，公有仓库隐藏具体仓库名）。设为 `true` 则在 Actions Summary 中展示明细表格 |
+| `DEBUG_MODE` | 选填 | 默认为 `false`（标准日志模式，简洁输出）。设为 `true`（Debug 详细日志模式）则在 Actions 控制台与 Summary 中输出详细明细表格 |
 
 > **提示（可选环境变量）**：
 > 如果需要排除特定仓库，可以在 **Variables**（仓库变量）中添加：

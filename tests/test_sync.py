@@ -13,7 +13,7 @@ from src.syncer import (
     sync_single_branch,
     sync_repository_branches,
 )
-from src.main import generate_step_summary, PrivacyLogFilter, parse_repo_list
+from src.main import generate_step_summary, StandardLogFilter, parse_repo_list
 import logging
 
 
@@ -160,8 +160,8 @@ class TestSyncLogic(unittest.TestCase):
             json_data={"enabled": False},
         )
 
-    def test_generate_step_summary_privacy_mode(self):
-        """Test generating markdown step summary in non-debug privacy mode."""
+    def test_generate_step_summary_standard_mode(self):
+        """Test generating markdown step summary in standard non-debug mode."""
         results = [
             RepoSyncResult(
                 repo_name="user/secret-repo",
@@ -181,18 +181,18 @@ class TestSyncLogic(unittest.TestCase):
         start = datetime.now(timezone.utc)
         end = datetime.now(timezone.utc)
         # Default debug_mode=False
-        summary_private = generate_step_summary(results, stats, start, end, debug_mode=False)
-        self.assertIn("隐私保护模式已生效", summary_private)
-        self.assertNotIn("secret-repo", summary_private)
+        summary_standard = generate_step_summary(results, stats, start, end, debug_mode=False)
+        self.assertIn("标准日志模式", summary_standard)
+        self.assertNotIn("secret-repo", summary_standard)
 
         # debug_mode=True
         summary_debug = generate_step_summary(results, stats, start, end, debug_mode=True)
         self.assertIn("Debug Mode", summary_debug)
         self.assertIn("user/secret-repo", summary_debug)
 
-    def test_privacy_log_filter(self):
-        """Test PrivacyLogFilter masking sensitive names from log records."""
-        filter_inst = PrivacyLogFilter()
+    def test_standard_log_filter(self):
+        """Test StandardLogFilter sanitizing names in standard mode."""
+        filter_inst = StandardLogFilter()
         filter_inst.add_term("my-secret-repo")
         filter_inst.add_term("alice_user")
 
