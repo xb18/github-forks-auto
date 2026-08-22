@@ -41,9 +41,26 @@ class RepoSyncResult:
 
 def get_repo_branches(client: GitHubClient, repo_full_name: str) -> Dict[str, str]:
     """
-    Fetch all branches of a repository.
+    Fetch all branches of a repository using lightweight Git matching-refs API.
+    Reduces API calls from multiple paginated pages down to 1 single request.
     Returns: {branch_name: commit_sha}
     """
+    resp = client.get(f"/repos/{repo_full_name}/git/matching-refs/heads")
+    if resp.status_code == 200:
+        refs_data = resp.json()
+        if isinstance(refs_data, list) and refs_data:
+            branch_map: Dict[str, str] = {}
+            for r in refs_data:
+                ref_name = r.get("ref", "")
+                if ref_name.startswith("refs/heads/"):
+                    b_name = ref_name[len("refs/heads/"):]
+                    sha = r.get("object", {}).get("sha")
+                    if b_name and sha:
+                        branch_map[b_name] = sha
+            if branch_map:
+                return branch_map
+
+    # Fallback to paginated branches API if matching-refs is empty or unsupported
     branches_data = client.get_paginated(f"/repos/{repo_full_name}/branches")
     branch_map: Dict[str, str] = {}
     for b in branches_data:
