@@ -1,0 +1,12 @@
+{
+  "gh_pat": "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "feishu_webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "feishu_secret": "",
+  "exclude_repos": [
+    "my-customized-fork-1",
+    "username/special-repo"
+  ],
+  "include_only": [],
+  "disable_actions": true,
+  "dry_run": false
+}
