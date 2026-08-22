@@ -41,6 +41,17 @@ class PrivacyLogFilter(logging.Filter):
         return True
 
 
+import re
+
+def parse_repo_list(val: Any) -> List[str]:
+    """Parse comma/semicolon/newline separated string or list of repository names."""
+    if isinstance(val, list):
+        return [str(x).strip() for x in val if str(x).strip()]
+    if isinstance(val, str):
+        return [x.strip() for x in re.split(r'[,;\n\r]+', val) if x.strip()]
+    return []
+
+
 def load_config() -> Dict[str, Any]:
     """Load configuration from config.json if present, then override with environment variables."""
     config: Dict[str, Any] = {
@@ -67,11 +78,15 @@ def load_config() -> Dict[str, Any]:
     # Environment variables override
     env_exclude = os.environ.get("EXCLUDE_REPOS")
     if env_exclude:
-        config["exclude_repos"] = [r.strip() for r in env_exclude.split(",") if r.strip()]
+        config["exclude_repos"] = parse_repo_list(env_exclude)
+    elif config.get("exclude_repos"):
+        config["exclude_repos"] = parse_repo_list(config["exclude_repos"])
 
     env_include = os.environ.get("INCLUDE_ONLY")
     if env_include:
-        config["include_only"] = [r.strip() for r in env_include.split(",") if r.strip()]
+        config["include_only"] = parse_repo_list(env_include)
+    elif config.get("include_only"):
+        config["include_only"] = parse_repo_list(config["include_only"])
 
     return config
 
@@ -203,17 +218,20 @@ def main() -> int:
 
     logger.info(f"Found {len(repos)} total owned repos, {len(fork_repos)} are forked repositories.")
 
-    exclude_set: Set[str] = set(config.get("exclude_repos", []))
-    include_set: Set[str] = set(config.get("include_only", []))
+    exclude_set: Set[str] = {r.lower() for r in config.get("exclude_repos", [])}
+    include_set: Set[str] = {r.lower() for r in config.get("include_only", [])}
 
     filtered_forks: List[Dict[str, Any]] = []
     for r in fork_repos:
-        name = r.get("name")
-        full_name = r.get("full_name")
-        if include_set and (name not in include_set and full_name not in include_set):
+        name = r.get("name", "")
+        full_name = r.get("full_name", "")
+        name_lower = name.lower()
+        full_name_lower = full_name.lower()
+
+        if include_set and (name_lower not in include_set and full_name_lower not in include_set):
             logger.info(f"Skipping {full_name} (not in include_only list)")
             continue
-        if name in exclude_set or full_name in exclude_set:
+        if name_lower in exclude_set or full_name_lower in exclude_set:
             logger.info(f"Skipping {full_name} (matches exclude_repos)")
             continue
         filtered_forks.append(r)

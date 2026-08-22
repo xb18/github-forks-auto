@@ -13,7 +13,7 @@ from src.syncer import (
     sync_single_branch,
     sync_repository_branches,
 )
-from src.main import generate_step_summary, PrivacyLogFilter
+from src.main import generate_step_summary, PrivacyLogFilter, parse_repo_list
 import logging
 
 
@@ -236,6 +236,12 @@ class TestSyncLogic(unittest.TestCase):
         with self.assertRaises(PermissionError) as ctx:
             client.get_authenticated_user()
         self.assertIn("已失效或已过期", str(ctx.exception))
+
+    def test_parse_repo_list(self):
+        """Test parsing comma, semicolon, newline delimited repo strings."""
+        val = "repo1, owner/repo2; repo3\nrepo4\r\nrepo5"
+        res = parse_repo_list(val)
+        self.assertEqual(res, ["repo1", "owner/repo2", "repo3", "repo4", "repo5"])
 
 
 if __name__ == "__main__":
