@@ -271,20 +271,6 @@ def send_feishu_card(
         }
     ]
 
-    if warn_chunks and not template_has_issues:
-        warn_text = f"{t('feishu_warn_section_title', lang=current_lang)}\n" + "\n".join(f"- {w}" for w in warn_chunks[0])
-        first_elements.extend([
-            {"tag": "hr"},
-            {"tag": "div", "text": {"tag": "lark_md", "content": warn_text}},
-        ])
-
-    if err_chunks and not template_has_issues:
-        err_text = f"{t('feishu_err_section_title', lang=current_lang)}\n" + "\n".join(f"- {e}" for e in err_chunks[0])
-        first_elements.extend([
-            {"tag": "hr"},
-            {"tag": "div", "text": {"tag": "lark_md", "content": err_text}},
-        ])
-
     first_title = f"{title} (1/{total_parts})" if total_parts > 1 else title
     first_card = {
         "config": {"wide_screen_mode": True},
