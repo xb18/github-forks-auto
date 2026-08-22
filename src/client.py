@@ -28,10 +28,15 @@ class GitHubClient:
         path: str,
         params: Optional[Dict[str, Any]] = None,
         json_data: Optional[Dict[str, Any]] = None,
-        max_retries: int = 3,
+        max_retries: int = 5,
     ) -> requests.Response:
-        """Perform an HTTP request with basic retry logic."""
+        """Perform an HTTP request with rate-limit detection and exponential retry logic."""
         url = path if path.startswith("http") else f"{self.base_url}/{path.lstrip('/')}"
+        
+        # Add gentle rate limiting on write operations to avoid secondary abuse limits
+        if method.upper() in ("POST", "PATCH", "PUT", "DELETE"):
+            time.sleep(0.2)
+
         for attempt in range(1, max_retries + 1):
             try:
                 response = self.session.request(
@@ -42,9 +47,42 @@ class GitHubClient:
                     timeout=30,
                 )
 
-                # Check rate limit
+                # 1. Detect 403/429 Rate Limit Exceeded
+                is_rate_limited = (
+                    response.status_code == 429
+                    or (
+                        response.status_code == 403
+                        and (
+                            "rate limit" in response.text.lower()
+                            or response.headers.get("x-ratelimit-remaining") == "0"
+                        )
+                    )
+                )
+
+                if is_rate_limited:
+                    reset_time = int(response.headers.get("x-ratelimit-reset", 0))
+                    retry_after = response.headers.get("Retry-After")
+                    if retry_after:
+                        wait_seconds = int(retry_after)
+                    elif reset_time > 0:
+                        wait_seconds = max(reset_time - int(time.time()) + 1, 5)
+                    else:
+                        wait_seconds = 60
+
+                    if attempt < max_retries:
+                        logger.warning(
+                            f"GitHub API Rate Limit exceeded ({response.status_code}). "
+                            f"Waiting {wait_seconds}s until reset (attempt {attempt}/{max_retries})..."
+                        )
+                        time.sleep(wait_seconds)
+                        continue
+                    else:
+                        logger.error(f"GitHub API Rate Limit still exceeded after {max_retries} retries.")
+                        return response
+
+                # 2. Pre-emptive check if rate limit is nearly exhausted
                 remaining = response.headers.get("x-ratelimit-remaining")
-                if remaining is not None and int(remaining) < 10:
+                if remaining is not None and int(remaining) < 5:
                     reset_time = int(response.headers.get("x-ratelimit-reset", 0))
                     wait_seconds = max(reset_time - int(time.time()), 5)
                     logger.warning(
@@ -52,12 +90,6 @@ class GitHubClient:
                         f"Waiting {wait_seconds}s until reset."
                     )
                     time.sleep(min(wait_seconds, 60))
-
-                if response.status_code == 429:
-                    retry_after = int(response.headers.get("Retry-After", 10))
-                    logger.warning(f"Rate limited (429). Retrying in {retry_after}s...")
-                    time.sleep(retry_after)
-                    continue
 
                 if response.status_code >= 500 and attempt < max_retries:
                     logger.warning(
