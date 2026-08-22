@@ -198,6 +198,7 @@ def sync_single_branch(
 def sync_repository_branches(
     client: GitHubClient,
     repo_data: Dict[str, Any],
+    debug_mode: bool = False,
 ) -> RepoSyncResult:
     """
     Sync all branches of a single forked repository.
@@ -228,7 +229,8 @@ def sync_repository_branches(
     upstream_full_name = parent.get("full_name")
     result.upstream_name = upstream_full_name
 
-    logger.info(f"==> Processing fork: {fork_full_name} (Upstream: {upstream_full_name})")
+    if debug_mode:
+        logger.info(f"==> Processing fork: {fork_full_name} (Upstream: {upstream_full_name})")
 
     # Fetch branches from both repositories
     try:
@@ -255,7 +257,10 @@ def sync_repository_branches(
     total_b = len(branch_items)
     for b_idx, (branch_name, upstream_sha) in enumerate(branch_items, start=1):
         fork_sha = fork_branches.get(branch_name)
-        logger.info(f"  🌿 [分支 {b_idx}/{total_b}] 处理分支 '{branch_name}'...")
+        if debug_mode:
+            logger.info(f"  🌿 [分支 {b_idx}/{total_b}] 处理分支 '{branch_name}'...")
+        else:
+            logger.info(f"  🌿 正在比对分支...")
         b_res = sync_single_branch(
             client=client,
             fork_full_name=fork_full_name,

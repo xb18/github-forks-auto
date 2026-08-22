@@ -216,8 +216,6 @@ def main() -> int:
 
     fork_repos = [r for r in repos if r.get("fork") is True]
 
-    logger.info(f"Found {len(repos)} total owned repos, {len(fork_repos)} are forked repositories.")
-
     exclude_set: Set[str] = {r.lower() for r in config.get("exclude_repos", [])}
     include_set: Set[str] = {r.lower() for r in config.get("include_only", [])}
 
@@ -229,14 +227,20 @@ def main() -> int:
         full_name_lower = full_name.lower()
 
         if include_set and (name_lower not in include_set and full_name_lower not in include_set):
-            logger.info(f"Skipping {full_name} (not in include_only list)")
+            if debug_mode:
+                logger.info(f"Skipping {full_name} (not in include_only list)")
             continue
         if name_lower in exclude_set or full_name_lower in exclude_set:
-            logger.info(f"Skipping {full_name} (matches exclude_repos)")
+            if debug_mode:
+                logger.info(f"Skipping {full_name} (matches exclude_repos)")
             continue
         filtered_forks.append(r)
 
-    logger.info(f"Total forked repos to process: {len(filtered_forks)}")
+    if debug_mode:
+        logger.info(f"Found {len(repos)} total owned repos, {len(fork_repos)} are forked repositories.")
+        logger.info(f"Total forked repos to process: {len(filtered_forks)}")
+    else:
+        logger.info("已成功获取 Fork 仓库列表，准备开始同步...")
 
     results: List[RepoSyncResult] = []
     warnings_list: List[str] = []
@@ -258,7 +262,10 @@ def main() -> int:
         progress_pct = int((idx / total_repos_count) * 100) if total_repos_count > 0 else 100
 
         logger.info(f"\n" + "-" * 60)
-        logger.info(f"🔄 [进度: {idx}/{total_repos_count} ({progress_pct}%)] 正在处理仓库: {repo_full_name}")
+        if debug_mode:
+            logger.info(f"🔄 [进度: {idx}/{total_repos_count} ({progress_pct}%)] 正在处理仓库: {repo_full_name}")
+        else:
+            logger.info(f"🔄 [进度: {progress_pct}%] 正在处理仓库...")
         logger.info("-" * 60)
 
         if privacy_filter and repo_data.get("parent"):
@@ -275,7 +282,7 @@ def main() -> int:
 
         # 2. Sync all branches
         try:
-            repo_res = sync_repository_branches(client, repo_data)
+            repo_res = sync_repository_branches(client, repo_data, debug_mode=debug_mode)
             results.append(repo_res)
 
             if repo_res.error_message:
@@ -304,11 +311,14 @@ def main() -> int:
             results.append(RepoSyncResult(repo_name=repo_full_name, error_message=err_msg))
             errors_list.append(f"`{repo_full_name}`: {err_msg}")
 
-        logger.info(
-            f"✅ [进度: {idx}/{total_repos_count}] {repo_full_name} 处理完毕 | "
-            f"累计: 同步成功 {stats['synced_branches']}, 新建 {stats['created_branches']}, "
-            f"最新 {stats['uptodate_branches']}, 跳过 {stats['skipped_branches']}, 失败 {stats['failed']}"
-        )
+        if debug_mode:
+            logger.info(
+                f"✅ [进度: {idx}/{total_repos_count}] {repo_full_name} 处理完毕 | "
+                f"累计: 同步成功 {stats['synced_branches']}, 新建 {stats['created_branches']}, "
+                f"最新 {stats['uptodate_branches']}, 跳过 {stats['skipped_branches']}, 失败 {stats['failed']}"
+            )
+        else:
+            logger.info(f"✅ [进度: {progress_pct}%] 当前仓库处理完毕")
 
     end_time = datetime.now(timezone.utc)
 
