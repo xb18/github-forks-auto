@@ -2,8 +2,8 @@ name: Keep Alive Heartbeat
 
 on:
   schedule:
-    # Runs on the 1st and 15th of every month at 04:15 UTC (every ~15-30 days to prevent 60-day inactivity pause)
-    - cron: '15 4 1,15 * *'
+    # Runs once a week on Wednesday at 04:15 UTC (12:15 PM Beijing Time)
+    - cron: '15 4 * * 3'
   workflow_dispatch:
 
 concurrency:
