@@ -10,3 +10,7 @@
 • ✅ 保持最新状态: **{uptodate_branches}** 个分支
 • 🛡️ 安全跳过保护: **{skipped_branches}** 个分支
 • ❌ 异常失败记录: **{failed}** 个
+
+---
+
+{issues}

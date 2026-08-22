@@ -128,6 +128,8 @@
 
 **支持的占位符变量**：
 - `{execution_time}`：任务执行时间
+- `{status_emoji}`：状态图标（🟢 正常 / 🟡 跳过 / 🔴 异常）
+- `{status_text}`：状态文字（`全部正常` / `有跳过提醒` / `发生异常`）
 - `{total_repos}`：扫描的 Fork 仓库总数
 - `{actions_disabled_repos}`：Actions 已禁用的仓库数
 - `{synced_branches}`：安全 Fast-Forward 同步成功的分支数
@@ -135,6 +137,9 @@
 - `{uptodate_branches}`：保持最新的分支数
 - `{skipped_branches}`：安全跳过（分叉/硬回退保护）的分支数
 - `{failed}`：异常失败数
+- `{issues}`：**问题仓库与分支明细汇总**（包含具体仓库名、分支名与跳过/失败原因）
+- `{warnings}`：安全跳过/分叉保护的分支明细
+- `{errors}`：异常失败的分支明细
 
 ---
 

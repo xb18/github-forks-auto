@@ -65,14 +65,20 @@ def format_stats_markdown(
     execution_time_str: str,
     template_str: Optional[str] = None,
     template_file: str = "report_template.md",
+    warnings: Optional[List[str]] = None,
+    errors: Optional[List[str]] = None,
 ) -> str:
     """
     Format the main statistics section using a template file or template string.
     Placeholders:
       {execution_time}, {total_repos}, {actions_disabled_repos},
       {synced_branches}, {created_branches}, {uptodate_branches},
-      {skipped_branches}, {failed}
+      {skipped_branches}, {failed}, {status_emoji}, {status_text},
+      {issues}, {warnings}, {errors}
     """
+    warnings = warnings or []
+    errors = errors or []
+
     raw_template = template_str
     if not raw_template and os.path.exists(template_file):
         try:
@@ -81,13 +87,23 @@ def format_stats_markdown(
         except Exception as exc:
             logger.warning(f"Failed to read template file {template_file}: {exc}")
 
+    failed_count = stats.get("failed", 0)
+    skipped_count = stats.get("skipped_branches", 0)
+    status_text = "发生异常" if failed_count > 0 else ("有跳过提醒" if skipped_count > 0 else "全部正常")
+    status_emoji = "🔴" if failed_count > 0 else ("🟡" if skipped_count > 0 else "🟢")
+
+    # Build issue strings
+    warn_text = "\n".join(f"- {w}" for w in warnings) if warnings else "无"
+    err_text = "\n".join(f"- {e}" for e in errors) if errors else "无"
+
+    issues_list = []
+    if warnings:
+        issues_list.append("**🛡️ 安全拦截与提醒事项 (避免代码丢失)**:\n" + warn_text)
+    if errors:
+        issues_list.append("**❌ 异常失败记录**:\n" + err_text)
+    issues_text = "\n\n".join(issues_list) if issues_list else "✅ 所有分支均保持最新或同步成功，无异常与跳过记录。"
+
     if raw_template:
-        failed_count = stats.get("failed", 0)
-        skipped_count = stats.get("skipped_branches", 0)
-
-        status_text = "发生异常" if failed_count > 0 else ("有跳过提醒" if skipped_count > 0 else "全部正常")
-        status_emoji = "🔴" if failed_count > 0 else ("🟡" if skipped_count > 0 else "🟢")
-
         replacements = {
             "execution_time": execution_time_str,
             "total_repos": str(stats.get("total_repos", 0)),
@@ -99,6 +115,9 @@ def format_stats_markdown(
             "failed": str(failed_count),
             "status_text": status_text,
             "status_emoji": status_emoji,
+            "issues": issues_text,
+            "warnings": warn_text,
+            "errors": err_text,
         }
         res = raw_template
         for key, val in replacements.items():
@@ -120,8 +139,8 @@ def format_stats_markdown(
         f"• 🛡️ 安全跳过保护: **{stats.get('skipped_branches', 0)}** 个分支",
     ]
 
-    if stats.get("failed", 0) > 0:
-        lines.append(f"• ❌ 同步异常失败: **{stats.get('failed', 0)}** 个")
+    if failed_count > 0:
+        lines.append(f"• ❌ 同步异常失败: **{failed_count}** 个")
 
     return "\n".join(lines)
 
@@ -147,8 +166,31 @@ def send_feishu_card(
 
     header_color = "red" if (len(errors) > 0 or stats.get("failed", 0) > 0) else ("orange" if len(warnings) > 0 else "blue")
 
+    # Read template if exists to check if user already embedded {issues}, {warnings}, or {errors}
+    raw_template = template_str
+    if not raw_template and os.path.exists("report_template.md"):
+        try:
+            with open("report_template.md", "r", encoding="utf-8") as f:
+                raw_template = f.read()
+        except Exception:
+            pass
+
+    template_has_issues = raw_template and any(k in raw_template for k in ("{issues}", "{warnings}", "{errors}"))
+
+    # Chunk warnings and errors for multi-card if needed
+    warn_chunks = chunk_list(warnings, batch_size) if warnings else []
+    err_chunks = chunk_list(errors, batch_size) if errors else []
+
     # Build structured markdown content for statistics
-    stats_md = format_stats_markdown(stats, execution_time_str, template_str=template_str)
+    first_warn = warn_chunks[0] if warn_chunks else []
+    first_err = err_chunks[0] if err_chunks else []
+    stats_md = format_stats_markdown(
+        stats,
+        execution_time_str,
+        template_str=template_str,
+        warnings=first_warn if template_has_issues else [],
+        errors=first_err if template_has_issues else [],
+    )
 
     # Chunk warnings and errors
     warn_chunks = chunk_list(warnings, batch_size) if warnings else []
