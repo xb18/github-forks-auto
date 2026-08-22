@@ -67,7 +67,7 @@ jobs:
           EXCLUDE_REPOS: ${{ vars.EXCLUDE_REPOS || secrets.EXCLUDE_REPOS }}
           INCLUDE_ONLY: ${{ vars.INCLUDE_ONLY || secrets.INCLUDE_ONLY }}
           DEBUG_MODE: ${{ inputs.debug_mode != '' && inputs.debug_mode || secrets.DEBUG_MODE || vars.DEBUG_MODE || 'false' }}
-          DISABLE_ACTIONS: ${{ inputs.disable_actions != '' && inputs.disable_actions || 'true' }}
-          DRY_RUN: ${{ inputs.dry_run != '' && inputs.dry_run || 'false' }}
+          DISABLE_ACTIONS: ${{ inputs.disable_actions != '' && inputs.disable_actions || secrets.DISABLE_ACTIONS || vars.DISABLE_ACTIONS || 'true' }}
+          DRY_RUN: ${{ inputs.dry_run != '' && inputs.dry_run || secrets.DRY_RUN || vars.DRY_RUN || 'false' }}
         run: |
           python -m src.main
