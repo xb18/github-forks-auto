@@ -44,15 +44,23 @@
 
 #### 步骤 1：创建 GitHub Personal Access Token (PAT)
 
-由于需要访问和更新你账号下的所有 Fork 仓库并管理 Actions 权限，需要创建一个 PAT：
+由于需要自动扫描、更新所有 Fork 仓库的分支，以及**修改仓库 Actions 的禁用权限**，需要创建一个具有相应权限的 PAT：
 
+##### 推荐方式 A：Tokens (classic) —— 最省事推荐 👍
 1. 登录 GitHub，点击右上角头像 -> **Settings** -> **Developer Settings** -> **Personal access tokens** -> **Tokens (classic)**。
 2. 点击 **Generate new token (classic)**。
-3. **Expiration**：建议选择 `No expiration`（无过期）。
-4. **Scopes 勾选权限**：
-   - ✅ `repo`（完整控制私有与公开仓库、读写分支、Commit）
-   - ✅ `workflow`（更新包含工作流的仓库）
-5. 点击 **Generate token** 并复制保存 Token（例如：`ghp_xxxx`）。
+3. **Expiration**：建议选择 `No expiration`（无过期时间，永久免维护）。
+4. **Scopes 勾选权限**（只需勾选以下 2 个大项）：
+   - ✅ **`repo`**（勾选主项 `repo`，包含访问私有/公开仓库、分支读写、以及**禁用/管理仓库 Actions 设置**的全部权限）
+   - ✅ **`workflow`**（允许更新包含 GitHub Actions `.github/workflows/` 工作流文件的分支）
+5. 点击 **Generate token** 并复制保存 Token（格式如 `ghp_xxxx`）。
+
+##### 备选方式 B：Fine-grained tokens (细粒度 Token)
+若使用 Fine-grained Token，在 **Repository permissions** 下需要开启：
+- **Actions**: `Read and write`（管理 Actions 状态）
+- **Administration**: `Read and write`（修改仓库设置与权限）
+- **Contents**: `Read and write`（读写分支与代码）
+- **Workflows**: `Read and write`（同步含工作流的分支）
 
 ---
 
