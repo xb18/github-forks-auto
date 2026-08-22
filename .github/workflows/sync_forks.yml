@@ -9,6 +9,10 @@ on:
     types: [started]
   workflow_dispatch:
     inputs:
+      debug_mode:
+        description: 'Enable debug mode (display detailed repo names in public summary)'
+        type: boolean
+        default: false
       disable_actions:
         description: 'Disable GitHub Actions on all forked repos'
         type: boolean
@@ -26,6 +30,8 @@ jobs:
   sync-forks:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # If triggered by Star (watch), only execute if the star is by the repo owner
+    if: github.event_name != 'watch' || github.actor == github.repository_owner
 
     steps:
       - name: Checkout repository
@@ -49,6 +55,7 @@ jobs:
           FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
           EXCLUDE_REPOS: ${{ vars.EXCLUDE_REPOS }}
           INCLUDE_ONLY: ${{ vars.INCLUDE_ONLY }}
+          DEBUG_MODE: ${{ inputs.debug_mode != '' && inputs.debug_mode || secrets.DEBUG_MODE || vars.DEBUG_MODE || 'false' }}
           DISABLE_ACTIONS: ${{ inputs.disable_actions != '' && inputs.disable_actions || 'true' }}
           DRY_RUN: ${{ inputs.dry_run != '' && inputs.dry_run || 'false' }}
         run: |

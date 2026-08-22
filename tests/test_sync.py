@@ -159,12 +159,12 @@ class TestSyncLogic(unittest.TestCase):
             json_data={"enabled": False},
         )
 
-    def test_generate_step_summary(self):
-        """Test generating markdown step summary."""
+    def test_generate_step_summary_privacy_mode(self):
+        """Test generating markdown step summary in non-debug privacy mode."""
         results = [
             RepoSyncResult(
-                repo_name="user/test-repo",
-                upstream_name="upstream/test-repo",
+                repo_name="user/secret-repo",
+                upstream_name="upstream/secret-repo",
                 actions_disabled=True,
             )
         ]
@@ -179,9 +179,15 @@ class TestSyncLogic(unittest.TestCase):
         }
         start = datetime.now(timezone.utc)
         end = datetime.now(timezone.utc)
-        summary = generate_step_summary(results, stats, start, end)
-        self.assertIn("GitHub Fork 仓库全量同步与管理报告", summary)
-        self.assertIn("user/test-repo", summary)
+        # Default debug_mode=False
+        summary_private = generate_step_summary(results, stats, start, end, debug_mode=False)
+        self.assertIn("隐私保护模式已生效", summary_private)
+        self.assertNotIn("secret-repo", summary_private)
+
+        # debug_mode=True
+        summary_debug = generate_step_summary(results, stats, start, end, debug_mode=True)
+        self.assertIn("Debug Mode", summary_debug)
+        self.assertIn("user/secret-repo", summary_debug)
 
 
 if __name__ == "__main__":

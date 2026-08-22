@@ -30,6 +30,7 @@ def load_config() -> Dict[str, Any]:
         "include_only": [],
         "disable_actions": os.environ.get("DISABLE_ACTIONS", "true").lower() in ("true", "1", "yes"),
         "dry_run": os.environ.get("DRY_RUN", "false").lower() in ("true", "1", "yes"),
+        "debug_mode": os.environ.get("DEBUG_MODE", "false").lower() in ("true", "1", "yes"),
     }
 
     # Check local config file
@@ -59,6 +60,7 @@ def generate_step_summary(
     stats: Dict[str, int],
     start_time: datetime,
     end_time: datetime,
+    debug_mode: bool = False,
 ) -> str:
     """Generate GitHub Step Summary Markdown string."""
     duration = (end_time - start_time).total_seconds()
@@ -79,10 +81,18 @@ def generate_step_summary(
         f"| 🚫 Actions 已禁用仓库 | **{stats.get('actions_disabled_repos', 0)}** |",
         f"| ❌ 异常/失败 | **{stats.get('failed', 0)}** |",
         "",
-        "### 📝 仓库处理明细",
+    ]
+
+    if not debug_mode:
+        lines.append("> 🔒 **隐私保护模式已生效**：当前为非 Debug 模式，已隐藏所有具体仓库名称与分支明细，确保公有仓库运行安全。完整变更明细已私密推送至飞书。如需在 GitHub 页面公开显示详细表格，可设置 Secret `DEBUG_MODE=true`。")
+        lines.append("")
+        return "\n".join(lines)
+
+    lines.extend([
+        "### 📝 仓库处理明细 (Debug Mode)",
         "| 仓库名称 | 上游仓库 | 分支 | 状态 | 详细信息 |",
         "| :--- | :--- | :--- | :--- | :--- |",
-    ]
+    ])
 
     for r in results:
         upstream_display = r.upstream_name or "N/A"
@@ -213,7 +223,8 @@ def main() -> int:
     end_time = datetime.now(timezone.utc)
 
     # Output GitHub Step Summary
-    summary_md = generate_step_summary(results, stats, start_time, end_time)
+    debug_mode = config.get("debug_mode", False)
+    summary_md = generate_step_summary(results, stats, start_time, end_time, debug_mode=debug_mode)
     print("\n" + "=" * 50)
     print(summary_md)
     print("=" * 50 + "\n")
