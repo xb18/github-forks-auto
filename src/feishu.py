@@ -246,8 +246,8 @@ def send_feishu_card(
         execution_time_str,
         template_str=template_str,
         template_file=template_file,
-        warnings=first_warn,
-        errors=first_err,
+        warnings=warnings,
+        errors=errors,
         lang=current_lang,
     )
 
