@@ -129,12 +129,12 @@ def format_stats_markdown(
     err_repos = extract_repo_names(errors)
     all_issue_repos = list(dict.fromkeys(warn_repos + err_repos))
 
-    issue_repos_text = "\n".join(f"- `{r}`" for r in all_issue_repos) if all_issue_repos else "无"
-    issue_repos_inline_text = ", ".join(f"`{r}`" for r in all_issue_repos) if all_issue_repos else "无"
-    warning_repos_text = "\n".join(f"- `{r}`" for r in warn_repos) if warn_repos else "无"
-    warning_repos_inline_text = ", ".join(f"`{r}`" for r in warn_repos) if warn_repos else "无"
-    error_repos_text = "\n".join(f"- `{r}`" for r in err_repos) if err_repos else "无"
-    error_repos_inline_text = ", ".join(f"`{r}`" for r in err_repos) if err_repos else "无"
+    issue_repos_text = "\n".join(f"- `{r}`" for r in all_issue_repos) if all_issue_repos else "✅ 无"
+    issue_repos_inline_text = ", ".join(f"`{r}`" for r in all_issue_repos) if all_issue_repos else "✅ 无"
+    warning_repos_text = "\n".join(f"- `{r}`" for r in warn_repos) if warn_repos else "✅ 无"
+    warning_repos_inline_text = ", ".join(f"`{r}`" for r in warn_repos) if warn_repos else "✅ 无"
+    error_repos_text = "\n".join(f"- `{r}`" for r in err_repos) if err_repos else "✅ 无"
+    error_repos_inline_text = ", ".join(f"`{r}`" for r in err_repos) if err_repos else "✅ 无"
 
     if raw_template:
         replacements = {
