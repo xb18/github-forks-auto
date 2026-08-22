@@ -44,11 +44,11 @@ class StandardLogFilter(logging.Filter):
 import re
 
 def parse_repo_list(val: Any) -> List[str]:
-    """Parse comma/semicolon/newline separated string or list of repository names."""
+    """Parse comma/semicolon/space/newline separated string or list of repository names."""
     if isinstance(val, list):
         return [str(x).strip() for x in val if str(x).strip()]
     if isinstance(val, str):
-        return [x.strip() for x in re.split(r'[,;\n\r]+', val) if x.strip()]
+        return [x.strip() for x in re.split(r'[,;\s]+', val) if x.strip()]
     return []
 
 

@@ -238,10 +238,10 @@ class TestSyncLogic(unittest.TestCase):
         self.assertIn("已失效或已过期", str(ctx.exception))
 
     def test_parse_repo_list(self):
-        """Test parsing comma, semicolon, newline delimited repo strings."""
-        val = "repo1, owner/repo2; repo3\nrepo4\r\nrepo5"
+        """Test parsing comma, semicolon, space, newline delimited repo strings."""
+        val = "repo1, owner/repo2; repo3\nrepo4\r\nrepo5 repo6"
         res = parse_repo_list(val)
-        self.assertEqual(res, ["repo1", "owner/repo2", "repo3", "repo4", "repo5"])
+        self.assertEqual(res, ["repo1", "owner/repo2", "repo3", "repo4", "repo5", "repo6"])
 
 
 if __name__ == "__main__":
