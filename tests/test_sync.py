@@ -305,6 +305,7 @@ class TestSyncLogic(unittest.TestCase):
             errors=[],
             execution_time_str="2026-08-22 10:00:00 UTC",
             batch_size=10,
+            template_str="{execution_time}\n{warnings}",
         )
 
         self.assertTrue(ok)

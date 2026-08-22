@@ -251,16 +251,6 @@ def send_feishu_card(
         lang=current_lang,
     )
 
-    # Calculate total cards needed
-    total_parts = 1 + max(0, len(warn_chunks) - 1) + max(0, len(err_chunks) - 1)
-    if len(warn_chunks) > 1 and len(err_chunks) > 1:
-        total_parts = 1 + (len(warn_chunks) - 1) + (len(err_chunks) - 1)
-    elif len(warn_chunks) > 1:
-        total_parts = len(warn_chunks)
-    elif len(err_chunks) > 1:
-        total_parts = len(err_chunks)
-
-    # 1. First Card (Overview + First batch of warnings/errors)
     first_elements: List[Dict[str, Any]] = [
         {
             "tag": "div",
@@ -270,6 +260,24 @@ def send_feishu_card(
             },
         }
     ]
+
+    if not template_has_issues:
+        # Default concise mode: Only send 1 clean card
+        first_card = {
+            "config": {"wide_screen_mode": True},
+            "header": {"title": {"tag": "plain_text", "content": title}, "template": header_color},
+            "elements": first_elements,
+        }
+        return send_single_feishu_payload(webhook_url, secret, first_card)
+
+    # Verbose mode: Calculate total cards needed for verbose issues
+    total_parts = 1 + max(0, len(warn_chunks) - 1) + max(0, len(err_chunks) - 1)
+    if len(warn_chunks) > 1 and len(err_chunks) > 1:
+        total_parts = 1 + (len(warn_chunks) - 1) + (len(err_chunks) - 1)
+    elif len(warn_chunks) > 1:
+        total_parts = len(warn_chunks)
+    elif len(err_chunks) > 1:
+        total_parts = len(err_chunks)
 
     first_title = f"{title} (1/{total_parts})" if total_parts > 1 else title
     first_card = {
