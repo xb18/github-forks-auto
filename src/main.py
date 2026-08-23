@@ -57,6 +57,7 @@ def load_config() -> Dict[str, Any]:
     """Load configuration from config.json if present, then override with environment variables."""
     config: Dict[str, Any] = {
         "gh_pat": os.environ.get("GH_PAT") or os.environ.get("GITHUB_TOKEN", ""),
+        "enable_notification": os.environ.get("ENABLE_NOTIFICATION", os.environ.get("ENABLE_NOTIFICATIONS", "true")).lower() in ("true", "1", "yes"),
         "feishu_webhook_url": os.environ.get("FEISHU_WEBHOOK_URL", ""),
         "feishu_secret": os.environ.get("FEISHU_SECRET", ""),
         "smtp_host": os.environ.get("SMTP_HOST") or os.environ.get("SMTP_SERVER", ""),
@@ -86,6 +87,13 @@ def load_config() -> Dict[str, Any]:
             logger.warning(f"Failed to read {config_file}: {exc}")
 
     # Environment variables override
+    env_enable_notif = os.environ.get("ENABLE_NOTIFICATION", os.environ.get("ENABLE_NOTIFICATIONS"))
+    if env_enable_notif is not None:
+        config["enable_notification"] = env_enable_notif.lower() in ("true", "1", "yes")
+    elif "enable_notification" in config:
+        if isinstance(config["enable_notification"], str):
+            config["enable_notification"] = config["enable_notification"].lower() in ("true", "1", "yes")
+
     if os.environ.get("LANGUAGE"):
         config["language"] = os.environ.get("LANGUAGE")
     elif os.environ.get("LOCALE"):
@@ -180,6 +188,7 @@ def main() -> int:
     config = load_config()
     current_lang = get_current_language()
     debug_mode = config.get("debug_mode", False)
+    enable_notification = config.get("enable_notification", True)
 
     log_filter = None
     if not debug_mode:
@@ -194,20 +203,21 @@ def main() -> int:
     if not token:
         err_msg = t("log_missing_pat", lang=current_lang)
         logger.error(err_msg)
-        if feishu_webhook:
-            send_feishu_alert(
-                webhook_url=feishu_webhook,
-                secret=feishu_secret,
-                title=t("feishu_alert_title_missing_pat", lang=current_lang),
+        if enable_notification:
+            if feishu_webhook:
+                send_feishu_alert(
+                    webhook_url=feishu_webhook,
+                    secret=feishu_secret,
+                    title=t("feishu_alert_title_missing_pat", lang=current_lang),
+                    message=err_msg,
+                    lang=current_lang,
+                )
+            send_email_alert(
+                smtp_config=config,
+                title=t("email_alert_subject_missing_pat", lang=current_lang),
                 message=err_msg,
                 lang=current_lang,
             )
-        send_email_alert(
-            smtp_config=config,
-            title=t("email_alert_subject_missing_pat", lang=current_lang),
-            message=err_msg,
-            lang=current_lang,
-        )
         return 1
 
     client = GitHubClient(token=token)
@@ -221,20 +231,21 @@ def main() -> int:
     except Exception as exc:
         err_msg = t("log_auth_failed", lang=current_lang, exc=str(exc))
         logger.error(f"GitHub authentication error: {exc}")
-        if feishu_webhook:
-            send_feishu_alert(
-                webhook_url=feishu_webhook,
-                secret=feishu_secret,
-                title=t("feishu_alert_title_auth", lang=current_lang),
+        if enable_notification:
+            if feishu_webhook:
+                send_feishu_alert(
+                    webhook_url=feishu_webhook,
+                    secret=feishu_secret,
+                    title=t("feishu_alert_title_auth", lang=current_lang),
+                    message=err_msg,
+                    lang=current_lang,
+                )
+            send_email_alert(
+                smtp_config=config,
+                title=t("email_alert_subject_auth", lang=current_lang),
                 message=err_msg,
                 lang=current_lang,
             )
-        send_email_alert(
-            smtp_config=config,
-            title=t("email_alert_subject_auth", lang=current_lang),
-            message=err_msg,
-            lang=current_lang,
-        )
         return 1
 
     logger.info(t("log_fetching_repos", lang=current_lang))
@@ -408,30 +419,33 @@ def main() -> int:
         except Exception as exc:
             logger.warning(f"Could not write to GITHUB_STEP_SUMMARY: {exc}")
 
-    # Send Feishu Notification
-    if feishu_webhook:
-        logger.info("Sending Feishu notification card...")
-        send_feishu_card(
-            webhook_url=feishu_webhook,
-            secret=feishu_secret,
-            title=t("feishu_default_title", lang=current_lang),
+    # Send Notifications
+    if enable_notification:
+        if feishu_webhook:
+            logger.info("Sending Feishu notification card...")
+            send_feishu_card(
+                webhook_url=feishu_webhook,
+                secret=feishu_secret,
+                title=t("feishu_default_title", lang=current_lang),
+                stats=stats,
+                warnings=warnings_list,
+                errors=errors_list,
+                execution_time_str=start_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                lang=current_lang,
+            )
+
+        # Send Email Notification
+        send_email_notification(
+            smtp_config=config,
+            title=t("summary_title", lang=current_lang),
             stats=stats,
             warnings=warnings_list,
             errors=errors_list,
             execution_time_str=start_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
             lang=current_lang,
         )
-
-    # Send Email Notification
-    send_email_notification(
-        smtp_config=config,
-        title=t("summary_title", lang=current_lang),
-        stats=stats,
-        warnings=warnings_list,
-        errors=errors_list,
-        execution_time_str=start_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        lang=current_lang,
-    )
+    else:
+        logger.info("Message notifications are disabled (enable_notification=False).")
 
     logger.info(t("log_job_finished", lang=current_lang))
     return 0

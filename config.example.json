@@ -1,5 +1,6 @@
 {
   "language": "zh",
+  "enable_notification": true,
   "gh_pat": "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
   "feishu_webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
   "feishu_secret": "",

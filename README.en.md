@@ -1,8 +1,8 @@
-# GitHub Forks Auto Sync & Management (Full Scan / All Branches / Data Loss Prevention / Feishu & Email Notifications / i18n)
+# GitHub Forks Auto Sync & Management (Full Scan / All Branches / Data Loss Prevention / Feishu & Email Notifications)
 
 [English](README.en.md) | [简体中文](README.md)
 
-Automatically synchronizes all branches of all forked repositories under your GitHub account (including upstream new branches), automatically disables GitHub Actions on forked repositories to prevent unwanted quota consumption, and sends notifications to **Feishu (Lark) Bot** and **Email (SMTP)** upon completion. Fully supports internationalization (i18n).
+Automatically synchronizes all branches of all forked repositories under your GitHub account (including upstream new branches), automatically disables GitHub Actions on forked repositories to prevent unwanted quota consumption, and sends notifications to **Feishu (Lark) Bot** and **Email (SMTP)** upon completion.
 
 ---
 
@@ -20,7 +20,6 @@ Automatically synchronizes all branches of all forked repositories under your Gi
 - 📨 **Multi-Channel Notification Push**:
   - **Feishu / Lark Bot**: Sends interactive cards with sync overview and issue details (signature verification supported).
   - **SMTP Email Notifications**: Supports QQ Mail, NetEase 163, Gmail, Outlook, Enterprise Mail, and any custom SMTP server with responsive HTML reports.
-- 🌐 **Internationalization (i18n)**: Out-of-the-box support for English (`en`) and Chinese (`zh`) across console logs, Step Summary, Feishu cards, and Email notifications.
 - 📊 **GitHub Actions Step Summary**: Generates a clean Markdown summary table directly in the GitHub Actions run summary page.
 - ⚙️ **Whitelist / Blacklist Filtering**: Supports excluding repositories (`EXCLUDE_REPOS`) or syncing only specified repositories (`INCLUDE_ONLY`).
 
@@ -78,7 +77,7 @@ In your forked repository:
 | Configuration Key | Type | Required | Default | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | `GH_PAT` | Secret | **Required** | - | GitHub PAT generated in Step 1 (`repo` + `workflow` scopes) |
-| `LANGUAGE` | Secret / Var | Optional | `zh` | UI & Notification language: `en` (English) or `zh` (Chinese) |
+| `ENABLE_NOTIFICATION` | Secret / Var | Optional | `true` | Enable or disable notification push (Feishu / Email). Set to `false` to disable |
 | `FEISHU_WEBHOOK_URL` | Secret | Optional | - | Feishu / Lark custom bot Webhook URL |
 | `FEISHU_SECRET` | Secret | Optional | - | Feishu bot security signature secret (if enabled) |
 | `SMTP_HOST` | Secret / Var | Optional | - | SMTP server host (e.g. `smtp.gmail.com`, `smtp.office365.com`, `smtp.qq.com`) |
@@ -87,6 +86,7 @@ In your forked repository:
 | `SMTP_PASS` | Secret | Optional | - | Sender email password or App authorization password |
 | `SMTP_TO` | Secret / Var | Optional | Same as `SMTP_USER` | Recipient email address(es) (comma-separated for multiple) |
 | `SMTP_FROM_NAME` | Secret / Var | Optional | `GitHub Forks Auto` | Display sender name in email header |
+| `LANGUAGE` | Secret / Var | Optional | `zh` | UI & Notification language: `en` (English) or `zh` (Chinese) |
 | `DEBUG_MODE` | Secret / Var | Optional | `false` | Set to `true` to enable debug logs and public detail table in Actions summary |
 | `DISABLE_ACTIONS` | Secret / Var | Optional | `true` | Automatically disable GitHub Actions on forked repositories |
 | `EXCLUDE_REPOS` | Secret / Var | Optional | - | **Blacklist**: Repositories to exclude (e.g. `repo1,owner/repo2`) |
@@ -174,7 +174,6 @@ pip install -r requirements.txt
 
 # 2. Set environment variables and run
 export GH_PAT="ghp_your_personal_access_token"
-export LANGUAGE="en"
 export FEISHU_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
 
 # Optional Email SMTP configuration

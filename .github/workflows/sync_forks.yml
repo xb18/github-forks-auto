@@ -27,6 +27,10 @@ on:
           - zh
           - en
         default: zh
+      enable_notification:
+        description: 'Enable notification push (Feishu / Email) / 是否开启消息推送'
+        type: boolean
+        default: true
       include_only:
         description: 'Only sync specified repos (e.g. repo1,owner/repo2). Leave empty to sync all.'
         type: string
@@ -79,6 +83,7 @@ jobs:
       - name: Run Fork Synchronizer
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
+          ENABLE_NOTIFICATION: ${{ inputs.enable_notification != '' && inputs.enable_notification || vars.ENABLE_NOTIFICATION || secrets.ENABLE_NOTIFICATION || 'true' }}
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
           SMTP_HOST: ${{ secrets.SMTP_HOST || vars.SMTP_HOST }}

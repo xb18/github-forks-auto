@@ -1,8 +1,8 @@
-# GitHub Forks Auto Sync & Management (全量/全分支/安全防丢/飞书与邮件通知/i18n)
+# GitHub Forks Auto Sync & Management (全量/全分支/安全防丢/飞书与邮件通知)
 
 [简体中文](README.md) | [English](README.en.md)
 
-自动同步 GitHub 账号下所有 Fork 仓库的所有分支（包括上游新增分支），自动禁用 Fork 仓库的 GitHub Actions，并在执行完成后向**飞书机器人**和**邮箱**发送通知。支持多语言国际化 (i18n)。
+自动同步 GitHub 账号下所有 Fork 仓库的所有分支（包括上游新增分支），自动禁用 Fork 仓库的 GitHub Actions，并在执行完成后向**飞书机器人**和**邮箱**发送通知。
 
 ---
 
@@ -20,7 +20,6 @@
 - 📨 **多渠道通知推送**：
   - **飞书机器人**：运行完成后自动推送精美的**飞书交互式消息卡片 (Interactive Card)**（支持签名校验）。
   - **SMTP 邮箱推送**：支持 QQ 邮箱、163 网易邮箱、Gmail、Outlook、企业邮箱等，推送响应式 HTML 报告邮件。
-- 🌐 **多语言国际化 (i18n)**：支持中文 (`zh`) 与英文 (`en`)，包括日志输出、Step Summary、飞书卡片与邮件通知。
 - 📊 **Actions 概况报告**：自动在 GitHub Actions 运行页面生成 Markdown Step Summary 统计表格。
 - ⚙️ **黑/白名单过滤**：支持指定排除（`EXCLUDE_REPOS`）或仅同步特定仓库（`INCLUDE_ONLY`）。
 
@@ -78,7 +77,7 @@
 | 配置项 (Secret / Variable) | 类型 | 是否必填 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `GH_PAT` | Secret | **必填** | - | 步骤 1 生成的 GitHub PAT（Classic 勾选 `repo` 与 `workflow`） |
-| `LANGUAGE` | Secret / Var | 选填 | `zh` | 界面与通知语言，可选 `zh`（中文）或 `en`（英文） |
+| `ENABLE_NOTIFICATION` | Secret / Var | 选填 | `true` | 是否开启消息推送（飞书 / 邮件），设为 `false` 则关闭所有推送 |
 | `FEISHU_WEBHOOK_URL` | Secret | 选填 | - | 飞书自定义机器人的 Webhook 地址 |
 | `FEISHU_SECRET` | Secret | 选填 | - | 飞书机器人的安全设置签名校验密钥（若开启） |
 | `SMTP_HOST` | Secret / Var | 选填 | - | SMTP 邮件服务器地址（如 `smtp.qq.com`, `smtp.163.com`, `smtp.gmail.com`） |
@@ -87,6 +86,7 @@
 | `SMTP_PASS` | Secret | 选填 | - | 发件人邮箱密码或 SMTP 授权码（如 QQ邮箱 / 163 的客户端授权密码） |
 | `SMTP_TO` | Secret / Var | 选填 | 同 `SMTP_USER` | 收件人邮箱（支持多个邮箱，逗号分隔） |
 | `SMTP_FROM_NAME` | Secret / Var | 选填 | `GitHub Forks Auto` | 邮件中显示的发件人名称 |
+| `LANGUAGE` | Secret / Var | 选填 | `zh` | 界面与通知语言，可选 `zh`（中文）或 `en`（英文） |
 | `DEBUG_MODE` | Secret / Var | 选填 | `false` | 设为 `true` 开启 Debug 详细日志模式并在 Actions 页面输出明细表格 |
 | `DISABLE_ACTIONS` | Secret / Var | 选填 | `true` | 是否自动关闭 Fork 仓库的 Actions。设为 `false` 则不关闭 |
 | `EXCLUDE_REPOS` | Secret / Var | 选填 | - | **黑名单（排除指定仓库）**：填入仓库名（如 `repo1,owner/repo2`，逗号/分号/换行分隔） |
@@ -195,7 +195,6 @@ pip install -r requirements.txt
 
 # 2. 设置环境变量并运行
 export GH_PAT="ghp_your_personal_access_token"
-export LANGUAGE="zh" # 或 export LANGUAGE="en"
 export FEISHU_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
 
 # 配置邮箱推送（可选）
@@ -210,7 +209,6 @@ python -m src.main
 Windows PowerShell:
 ```powershell
 $env:GH_PAT="ghp_your_personal_access_token"
-$env:LANGUAGE="zh"
 $env:FEISHU_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxxx"
 python -m src.main
 ```

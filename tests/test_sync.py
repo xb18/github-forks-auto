@@ -531,6 +531,23 @@ class TestSyncLogic(unittest.TestCase):
         mock_server.login.assert_called_once_with("sender@qq.com", "auth_token_123")
         mock_server.sendmail.assert_called_once()
 
+    def test_load_config_enable_notification(self):
+        """Test load_config enable_notification defaults and environment variable overrides."""
+        with patch.dict("os.environ", {}, clear=True):
+            from src.main import load_config
+            cfg = load_config()
+            self.assertTrue(cfg.get("enable_notification"))
+
+        with patch.dict("os.environ", {"ENABLE_NOTIFICATION": "false"}, clear=True):
+            from src.main import load_config
+            cfg = load_config()
+            self.assertFalse(cfg.get("enable_notification"))
+
+        with patch.dict("os.environ", {"ENABLE_NOTIFICATION": "true"}, clear=True):
+            from src.main import load_config
+            cfg = load_config()
+            self.assertTrue(cfg.get("enable_notification"))
+
 
 if __name__ == "__main__":
     unittest.main()
